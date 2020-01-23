@@ -1,0 +1,41 @@
+syntax = "proto2";
+
+package proto;
+
+message Info {
+    optional uint64 offset = 1;
+    optional uint64 length = 2;
+}
+
+message Message {
+
+    enum MType {
+        AVAILABILITY_INFO_REQUEST = 5;
+        AVAILABILITY_INFO_RESPONSE = 6;
+        AVAILABILITY_INFO_ABORT = 7;
+        AVAILABILITY_INFO_FAILURE = 8;
+
+        DATA_REQUEST = 9;
+        DATA_RESPONSE = 10;
+        DATA_ABORT = 11;
+        DATA_FAILURE = 12;
+    }
+
+    enum ObjectType {
+        FILE = 1;
+        PATCH = 2;
+    }
+
+    required fixed32 magic_cookie = 1;
+    optional MType mtype = 2;
+    optional string obj_id = 3;
+    optional ObjectType obj_type = 4;
+
+    repeated Info info = 5;
+    optional bytes data = 6;
+    optional bytes error = 7;
+} 
+
+message Messages{
+   repeated Message msg = 11;
+}

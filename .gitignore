@@ -1,0 +1,62 @@
+.idea/*
+*.pyc
+*.log
+*.orig
+
+#__update_branch.py
+
+# PyInstaller stuff
+build/
+dist/
+
+# Unittesing stuff
+.cache
+.coverage
+htmlcov/
+tests_report.xml
+tests_integration_report.xml
+.pytest_cache
+
+# Doxygen generated docs
+doxygen-docs/
+
+# Virtualenv on Windows
+venv/
+virtualenv/
+
+# Application lock file and config
+.all_messages
+lock
+config.json
+.swap_dict_obj_id
+.swap_dict_fs_objects
+local_msg_queue/
+.diff_archive
+.file_table
+
+# Binary modules
+so
+*.dll
+
+/.objects_db
+
+# Compiled qt resources/windows
+/device_list.py
+/hanged_downloads_dialog.py
+/lost_folder_dialog.py
+/pvtbox_main.py
+/pvtbox_main_rc.py
+/selective_sync.py
+/settings.py
+/share_files.py
+/tutorial.py
+/transfers.py
+/insert_link.py
+/about.py
+/notifications.py
+
+# Icon resources
+Resources
+
+# Protobuf generated file
+service/network/browser_sharing/proto/proto_pb2.py

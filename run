@@ -1,0 +1,7 @@
+# Path to virtualenv for the project
+CURR_DIR=$(pwd)
+export VENV=$(CURR_DIR)/virtualenv/pvtbox
+
+export PATH=$PATH:$(CURR_DIR)/so
+export PYTHONPATH=$PYTHONPATH:so
+$VENV/bin/python3 app.py

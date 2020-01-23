@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24px" height="24px" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 43.1 (39012) - http://www.bohemiancoding.com/sketch -->
+    <title>Shape</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icons" transform="translate(-391.000000, -213.000000)" fill-rule="nonzero" stroke="#ADADAD">
+            <g id="video" transform="translate(392.000000, 214.000000)">
+                <g id="Capa_1">
+                    <path d="M11,0 C4.9346,0 0,4.9346 0,11 C0,17.0654 4.9346,22 11,22 C17.0654,22 22,17.0654 22,11 C22,4.9346 17.0654,0 11,0 Z M16.7064333,11.3028667 L8.63976667,16.8028667 C8.5778,16.8450333 8.50556667,16.8666667 8.43333333,16.8666667 C8.37466667,16.8666667 8.31563333,16.8527333 8.2621,16.8241333 C8.14183333,16.7607 8.06666667,16.6360333 8.06666667,16.5 L8.06666667,5.5 C8.06666667,5.36396667 8.14183333,5.2393 8.2621,5.17586667 C8.38236667,5.11206667 8.52756667,5.12086667 8.64013333,5.19713333 L16.7068,10.6971333 C16.8065333,10.7653333 16.8666667,10.8786333 16.8666667,11 C16.8666667,11.1213667 16.8065333,11.2346667 16.7064333,11.3028667 Z" id="Shape"></path>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,5 @@
+SET DATA_PATH=%USERPROFILE%\Pvtbox
+SET CFG_PATH=%LOCALAPPDATA%\.pvtbox
+rmdir /s /q %DATA_PATH%
+rmdir /s /q %CFG_PATH%
+

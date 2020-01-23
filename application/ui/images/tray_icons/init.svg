@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128px" height="128px" viewBox="0 0 128 128" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 51.3 (57544) - http://www.bohemiancoding.com/sketch -->
+    <title>logo_128_init</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="logo_128_init">
+            <rect id="Rectangle" fill="#FFFFFF" x="0" y="0" width="128" height="128" rx="20"></rect>
+            <path d="M6,51.1946572 L6.00136459,51.1973778 L45.6154479,22.84 L45.6154479,37.9553194 L16.5605714,58.7543572 L60.133333,89.9467918 L60.133333,113 L6,74.2465045 L6,51.1946572 Z M122,51.1946572 L121.99727,51.1973778 L82.3855503,22.84 L82.3855503,37.9553194 L111.439694,58.7543572 L67.8666659,89.9467918 L67.8666659,113 L122,74.2465045 L122,51.1946572 Z M71.9194892,15 L56.0805108,15 L56.0805108,56.3972212 L47.1327444,49.6583927 L36.933333,57.3382538 L63.9993483,77.7199997 L91.0666659,57.3382538 L80.8672545,49.6583927 L71.9194892,56.3972212 L71.9194892,15 Z" id="Fill-3" fill="#9B9B9B" fill-rule="nonzero"></path>
+        </g>
+    </g>
+</svg>

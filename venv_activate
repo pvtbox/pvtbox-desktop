@@ -1,0 +1,4 @@
+eval `grep "PROJECT=" Makefile`
+VENV=virtualenv/${PROJECT}
+make venv
+. ${VENV}/bin/activate

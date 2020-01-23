@@ -1,0 +1,22 @@
+pyside2<5.13.1
+pytest
+flake8
+mock
+pyinstaller<3.6
+autobahn[asyncio]
+requests
+filelock
+SQLAlchemy
+alembic
+scandir
+certifi
+sortedcontainers>=2.0
+psutil
+protobuf
+pypiwin32; sys_platform == 'win32'
+pywin32<=225; sys_platform == 'win32'
+wmi; sys_platform == 'win32'
+pyobjc-framework-cocoa; sys_platform == 'darwin'
+pyobjc-framework-LaunchServices; sys_platform == 'darwin'
+git+https://github.com/radiophysicist/nanomsg-python.git#egg=nanomsg
+git+https://github.com/pvtbox/watchdog-desktop.git@master#egg=watchdog
