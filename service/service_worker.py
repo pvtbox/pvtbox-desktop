@@ -32,6 +32,9 @@ from service.network.network_speed_calculator import NetworkSpeedCalculator
 from PySide2.QtCore import QTimer, Signal, QObject, Qt
 from PySide2.QtGui import QImageReader
 
+from common.utils import get_platform
+
+from common.utils import is_portable
 from .events_db import File, EventsDbBusy
 from .gui_proxy import GuiProxy
 from .service_server import ServiceServer
@@ -43,7 +46,7 @@ from common.utils import get_cfg_dir, get_data_dir, \
     make_dirs, remove_dir, create_shortcuts, get_bases_filename, \
     get_patches_dir, make_dir_hidden, get_dir_size, \
     get_free_space_mb, get_free_space, get_drive_name, \
-    wipe_internal, remove_file, benchmark
+    wipe_internal, remove_file, benchmark, is_first_launch, init_init_done
 from common.constants import FREE_LICENSE, GET_PRO_URI, UNKNOWN_LICENSE
 from common.constants import STATUS_WAIT, STATUS_PAUSE, STATUS_IN_WORK, \
     SS_STATUS_SYNCING, SS_STATUS_SYNCED, SS_STATUS_PAUSED, SUBSTATUS_SYNC, \
@@ -464,17 +467,15 @@ class ApplicationWorker(QObject):
 
     def _create_cfg_dir_if_needed(self):
         created = True
-        init_done_flag_filename = get_cfg_filename('init_done')
         # Assume it is first launch if configuration directory does not exist
-        NEW_USER = not op.exists(init_done_flag_filename)
+        new_user = is_first_launch()
 
         # It is the first launch
-        if NEW_USER:
+        if new_user:
             logger.info(
                 "Initializing configuration on the first launch...")
             # Here config init should be complete. Create flag file
-            touch(init_done_flag_filename)
-
+            init_init_done()
             self.create_sync_dir()
         elif not op.exists(get_patches_dir(self._cfg.sync_directory)):
             get_patches_dir(self._cfg.sync_directory, create=True)
@@ -605,6 +606,8 @@ class ApplicationWorker(QObject):
             self._file_status_manager.subscribe, Qt.QueuedConnection)
         shell_integration_signals.status_unsubscribe.connect(
             self._file_status_manager.unsubscribe, Qt.QueuedConnection)
+        shell_integration_signals.show_collaboration_settings.connect(
+            self._gui.show_collaboration_settings)
 
     def _connect_webshare_signals(self):
         self._webshare_handler.signals.share_download_complete.connect(

@@ -5,6 +5,7 @@ mock
 pyinstaller<3.6
 autobahn[asyncio]
 requests
+requests_toolbelt
 filelock
 SQLAlchemy
 alembic

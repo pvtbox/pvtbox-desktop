@@ -37,9 +37,50 @@
    </property>
    <item row="0" column="0">
     <widget class="QFrame" name="centralWidget">
+     <property name="styleSheet">
+      <string notr="true"> QScrollBar:vertical {
+     border: 0px;
+	background: #fedec9;
+     width: 8px;
+ }
+ QScrollBar::handle:vertical {
+	border: 0px solid #FC914D;
+     border-radius: 4px;
+     background: #FC914D;
+     min-height: 20px;
+ }
+ QScrollBar::add-line:vertical {
+     border: 0px;
+     background: none;
+     height: 0px;
+     subcontrol-position: bottom;
+     subcontrol-origin: margin;
+ }
+
+ QScrollBar::sub-line:vertical {
+     border: 0px;
+     background: none;
+     height: 0px;
+     subcontrol-position: top;
+     subcontrol-origin: margin;
+ }
+ QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+     border: 0px;
+     width: 0px;
+     height: 0px;
+     background: none;
+ }
+
+ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+     background: none;
+ }</string>
+     </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
        <widget class="DeviceListView" name="device_list_view">
+        <property name="styleSheet">
+         <string notr="true">border: 1px solid #aaaaaa</string>
+        </property>
         <property name="verticalScrollBarPolicy">
          <enum>Qt::ScrollBarAsNeeded</enum>
         </property>

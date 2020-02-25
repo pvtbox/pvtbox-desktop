@@ -20,7 +20,16 @@
    <string>Choose folders for selective sync</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <property name="margin">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
     <number>0</number>
    </property>
    <property name="spacing">
@@ -28,6 +37,44 @@
    </property>
    <item row="0" column="0">
     <widget class="QFrame" name="centralWidget">
+     <property name="styleSheet">
+      <string notr="true"> QScrollBar:vertical {
+     border: 0px;
+	background: #fedec9;
+     width: 8px;
+ }
+ QScrollBar::handle:vertical {
+	border: 0px solid #FC914D;
+     border-radius: 4px;
+     background: #FC914D;
+     min-height: 20px;
+ }
+ QScrollBar::add-line:vertical {
+     border: 0px;
+     background: none;
+     height: 0px;
+     subcontrol-position: bottom;
+     subcontrol-origin: margin;
+ }
+
+ QScrollBar::sub-line:vertical {
+     border: 0px;
+     background: none;
+     height: 0px;
+     subcontrol-position: top;
+     subcontrol-origin: margin;
+ }
+ QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical {
+     border: 0px;
+     width: 0px;
+     height: 0px;
+     background: none;
+ }
+
+ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+     background: none;
+ }</string>
+     </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
        <widget class="QLabel" name="label">
@@ -44,6 +91,65 @@
       </item>
       <item>
        <widget class="QTreeView" name="folder_list_view">
+        <property name="palette">
+         <palette>
+          <active/>
+          <inactive/>
+          <disabled/>
+         </palette>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QTreeView { border: 1px solid #aaaaaa; outline: none;}
+QTreeView::indicator{width: 16px; height: 16px;}
+QTreeView::indicator:checked:hover{image: url(:/images/check_radio/check_marked_hovered.svg);}
+QTreeView::indicator:checked{image: url(:/images/check_radio/check_marked_hovered.svg);}
+QTreeView::indicator:indeterminate:hover{image: url(:/images/check_radio/check_intermediate_hovered.svg);}
+QTreeView::indicator:indeterminate{image: url(:/images/check_radio/check_intermediate.svg);}
+QTreeView::indicator:unchecked:hover{image: url(:/images/check_radio/check_hovered.svg);}
+QTreeView::indicator:unchecked{image: url(:/images/check_radio/check.svg);}
+QTreeView::item:selected {
+    border: none;
+	background-color: #cccccc;
+	color: black;
+}
+QTreeView::item:!selected {
+    border: none;
+	background-color: #ffffff;
+	color: black;
+}
+QTreeView::item:hover {
+    border: none;
+	background-color: #eeeeee;
+	color: black;
+}
+QTreeView::branch:has-children:!has-siblings:closed:hover,
+QTreeView::branch:closed:has-children:has-siblings:hover {
+        border-image: none;
+        image: url(:/images/check_radio/chevron_down_hovered.svg);
+}
+
+QTreeView::branch:open:has-children:!has-siblings:hover,
+QTreeView::branch:open:has-children:has-siblings:hover  {
+        border-image: none;
+        image: url(:/images/check_radio/chevron_right_hovered.svg);
+}
+QTreeView::branch:has-children:!has-siblings:closed,
+QTreeView::branch:closed:has-children:has-siblings {
+        border-image: none;
+        image: url(:/images/check_radio/chevron_down.svg);
+	    selection-background-color: none;
+}
+
+QTreeView::branch:open:has-children:!has-siblings,
+QTreeView::branch:open:has-children:has-siblings  {
+        border-image: none;
+        image: url(:/images/check_radio/chevron_right.svg);
+		selection-background-color: none;
+}</string>
+        </property>
+        <property name="verticalScrollBarPolicy">
+         <enum>Qt::ScrollBarAsNeeded</enum>
+        </property>
         <property name="sortingEnabled">
          <bool>true</bool>
         </property>

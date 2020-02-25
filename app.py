@@ -84,7 +84,18 @@ def parseArgs(argv=sys.argv[1:]):
     )
 
     # Parse command line args and return as dict
-    args = vars(parser.parse_args(argv))
+    # args = vars(parser.parse_args(argv))
+    namespace, unrecognized = parser.parse_known_args(argv)
+    if unrecognized and len(unrecognized) == len(argv):
+        # argv possibly contains paths to copy to sync dir
+        new_argv = []
+        for arg in argv:
+            new_argv.append('--copy')
+            new_argv.append(arg)
+            sys.argv = sys.argv[0: 1] + new_argv
+        args = vars(parser.parse_args(new_argv))
+    else:
+        args = vars(namespace)
 
     return args
 

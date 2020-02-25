@@ -100,7 +100,7 @@ class FileStatusManager(QObject):
         if path:
             path = FilePath(path)
         else:
-            self._subscriptions.pop(client)
+            self._subscriptions.pop(client, None)
             return
         for client, subscription_paths in self._subscriptions.copy().items():
             new_subscription_paths = set()

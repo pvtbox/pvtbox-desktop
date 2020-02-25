@@ -23,7 +23,7 @@ import logging
 from nanomsg import Socket, PAIR
 from common.async_utils import run_daemon
 from common.utils import remove_socket_file
-import service.shell_integration.params as params
+from service.shell_integration import params as params
 from service.shell_integration.protocol import parse_message, emit_signal, \
     get_sync_dir_reply, create_command, get_is_sharing_reply
 

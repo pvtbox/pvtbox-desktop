@@ -102,5 +102,7 @@ build_resources:
 	pyside2-uic -o insert_link.py application/ui/insert_link.ui	
 	pyside2-uic -o about.py application/ui/about.ui
 	pyside2-uic -o notifications.py application/ui/notifications.ui
+	pyside2-uic -o support.py application/ui/support.ui
+	pyside2-uic -o collaborations.py application/ui/collaborations.ui
 	protoc --python_out=service/network/browser_sharing/proto --proto_path=service/network/browser_sharing/proto service/network/browser_sharing/proto/proto.proto
 

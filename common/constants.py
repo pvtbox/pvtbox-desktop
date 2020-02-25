@@ -106,6 +106,7 @@ inst.PRIVACY_URI = '{}/privacy'
 inst.API_URI = '{}/api'
 inst.API_EVENTS_URI = '{}/api/events'
 inst.API_SHARING_URI = '{}/api/sharing'
+inst.API_UPLOAD_URI = '{}/api/upload'
 
 inst.MIN_DIFF_SIZE = 11 * 1024
 inst.EMPTY_FILE_HASH = "d41d8cd98f00b204e9800998ecf8427e"

@@ -73,6 +73,8 @@ from .transfers_dialog import TransfersInfo
 from .about_dialog import AboutDialog
 from .file_list import GuiFileList
 from .notifications_dialog import Notifications
+from .support_dialog import SupportDialog
+from .collaboration_settings_dialog import CollaborationSettings
 
 
 # Setup logging
@@ -138,6 +140,7 @@ class GUI(QObject):
     starting_service = pyqtSignal()
     management_action_in_progress = pyqtSignal(str, str, str)
     final_exit = pyqtSignal()
+    service_started = pyqtSignal()
 
     close_about_dialog = pyqtSignal()
     _show_auth_page_signal = pyqtSignal(bool, bool)
@@ -193,9 +196,15 @@ class GUI(QObject):
             self, self._service, self._config, self._dp)
         self._service.add_receiver(self._gui_file_list)
         self._notifications = Notifications(
-            self, self._window, self._web_api, self._config, self._dp)
+            self, self._window, self._config, self._dp)
         self._service.add_receiver(self._notifications)
+        self._collaboration_settings = CollaborationSettings(
+            self, self._window, self._config, self._dp)
+        self._service.add_receiver(self._collaboration_settings)
+        self._support_dialog = SupportDialog(
+            self, self._window, self._config, self._dp)
 
+        self._set_settings_button_menu()
         self._init_tray()
 
         self._init_updater()
@@ -298,8 +307,8 @@ class GUI(QObject):
         self._lost_folder_opened = False
 
     def _init_self_hosted(self):
-        # Remove line below to make self-hosted button visible
-        self._ui.self_hostedButton.setVisible(False)
+        # Uncomment line below to make self-hosted button invisible
+        # self._ui.self_hostedButton.setVisible(False)
         return self._main_cfg.host != REGULAR_URI
 
     def _set_button_icons(self):
@@ -409,6 +418,7 @@ class GUI(QObject):
             self._post_login_ops()
 
         set_max_log_size_mb(logger, max(self._config.max_log_size, 0.02))
+        self.service_started.emit()
 
     def set_config(self, config, is_init=False):
         if is_init:
@@ -525,7 +535,6 @@ class GUI(QObject):
 
         self._app.installEventFilter(self)
 
-        self._set_settings_button_menu()
         self._set_fonts()
         self._set_welcome_label()
         self._set_accept_license_label()
@@ -556,7 +565,8 @@ class GUI(QObject):
 
         add_menu_item(tr('My devices'), self.on_show_device_list_click)
         add_menu_item(tr('Settings'), self.on_show_settings_click)
-        add_menu_item(tr('Help'), open_link(self._help_uri))
+        add_menu_item(tr('Help'), self._support_dialog.show)
+        # add_menu_item(tr('Help'), open_link(self._help_uri))
         add_menu_item(tr('About'), self._on_about_click)
         add_menu_item(tr('Exit'), self._on_exit_request)
 
@@ -792,9 +802,10 @@ class GUI(QObject):
             start_stop_texts[STATUS_INIT][0],
             self.on_start_stop_click, True, True)
         add_menu_item(tr('Settings'), self.on_show_settings_click, True)
-        add_menu_item(tr('Help'), open_link(self._help_uri))
+        add_menu_item(tr('Help'), self._support_dialog.show)
+        # add_menu_item(tr('Help'), open_link(self._help_uri))
         add_menu_item(tr('About'), self._on_about_click)
-        add_menu_item(tr('Exit'), self._on_exit_request)
+        add_menu_item(tr('Exit'), self.exit_request.emit)
 
         menu.show = menu.exec_
 
@@ -871,7 +882,7 @@ class GUI(QObject):
         self._updater_status = status
 
     def _on_about_click(self):
-        if self._dialogs_opened():
+        if self.dialogs_opened():
             return
 
         self._about_dialog_opened = True
@@ -901,15 +912,11 @@ class GUI(QObject):
         text = tr("I'm regular user") if self._self_hosted \
             else tr("I'm self-hosted user")
         ui.self_hostedButton.setText(text)
-        if self._self_hosted:
-            ui.auth_views.setCurrentWidget(ui.login_page)
-            ui.login_radioButton.setChecked(True)
-            ui.register_radioButton.setChecked(False)
-        else:
+        if not self._self_hosted:
             self._main_cfg.set_settings({'host': REGULAR_URI})
             self._config.set_settings({'host': REGULAR_URI})
             self._set_uris()
-        ui.register_radioButton.setEnabled(not self._self_hosted)
+        self.show_auth_page(show_registration=False)
 
     def run_with_splash(self):
         self._app.exec_()
@@ -1101,7 +1108,7 @@ class GUI(QObject):
         if not self._self_hosted:
             return True
 
-        regex = r'https?://.+\..+'
+        regex = r'.+\..+'
         host_control.setText(host_control.text().strip())
         if not re.match(regex, host_control.text()):
             error.setText(tr("Please enter a valid host address"))
@@ -1243,7 +1250,10 @@ class GUI(QObject):
             "user_email": self._ui.email_lineEdit.text(),
             "user_password_hash": password_hash}
         if self._self_hosted:
-            settings['host'] = self._ui.host_lineEdit.text()
+            host_text = self._ui.host_lineEdit.text()
+            host_addr = host_text if host_text.startswith('https://') \
+                else 'https://' + host_text
+            settings['host'] = host_addr
         else:
             settings['host'] = REGULAR_URI
         self._config.set_settings({'host': settings['host']})
@@ -1252,6 +1262,7 @@ class GUI(QObject):
             settings["devices"] = dict()
             self._nodes_actions.clear()
         self._main_cfg.set_settings(settings)
+        self._set_uris()
 
         self._login()
 
@@ -1529,7 +1540,7 @@ class GUI(QObject):
         self._close_opened_dialogs()
 
     def on_show_settings_click(self, migrate=False):
-        if self._dialogs_opened():
+        if self.dialogs_opened():
             return
 
         def on_logged_out(wipe_all):
@@ -1544,7 +1555,8 @@ class GUI(QObject):
                                  self.exit_service,
                                  parent=self._window,
                                  size=self._sync_dir_size,
-                                 migrate=migrate)
+                                 migrate=migrate,
+                                 dp=self._dp)
         settings_form.logged_out.connect(on_logged_out)
         settings_form.logging_disabled_changed.connect(
             on_logging_disabled_changed)
@@ -1573,7 +1585,7 @@ class GUI(QObject):
         self._devices_list_dialog.update_node_status(ss_node_status, new_substatus)
 
     def on_show_device_list_click(self):
-        if self._dialogs_opened() or self._devices_list_dialog:
+        if self.dialogs_opened() or self._devices_list_dialog:
             return
 
         self._devices_list_dialog = DeviceListDialog(
@@ -1998,15 +2010,18 @@ class GUI(QObject):
         self.exit_service()
         self.start_service()
 
-    def _dialogs_opened(self):
+    def dialogs_opened(self):
         return self._settings_opened or \
                self._about_dialog_opened or \
-               self._lost_folder_opened
+               self._lost_folder_opened or \
+               self._support_dialog.dialog_opened() or \
+               self._collaboration_settings.dialog_opened()
 
     def _any_dialog_opened(self):
-        return self._dialogs_opened() or \
+        return self.dialogs_opened() or \
                self._devices_list_dialog is not None or \
-               self._transfers_info.dialog_opened()
+               self._transfers_info.dialog_opened() or \
+               self._notifications.dialog_opened()
 
     def _open_path(self):
         if self._config:
@@ -2062,6 +2077,8 @@ class GUI(QObject):
         self._notifications.close()
         if self._devices_list_dialog:
             self._devices_list_dialog.close()
+        if self._collaboration_settings.dialog_opened():
+            self._collaboration_settings.close()
 
     def _on_management_action(self, action_name, action_type, node_id, is_itself):
         if is_itself:
@@ -2102,8 +2119,7 @@ class GUI(QObject):
                         else action_type
                     self.management_action_in_progress.emit(
                         action_name, ac_type, node_id)
-                if "info" in res:
-                    msg = res.get("info", "")
+                msg = str(res.get("info", msg))
         self.show_tray_notification(msg)
 
     def get_ui(self):
@@ -2117,3 +2133,13 @@ class GUI(QObject):
         self._web_fm_uri = WEB_FM_URI.format(host)
         self._privacy_uri = PRIVACY_URI.format(host)
         self._terms_uri = TERMS_URI.format(host)
+
+    def get_help_uri(self):
+        return self._help_uri
+
+    def is_logged_in(self):
+        return self._logged_in
+
+    @property
+    def web_api(self):
+        return self._web_api

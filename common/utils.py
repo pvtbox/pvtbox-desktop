@@ -41,6 +41,8 @@ from datetime import datetime
 import psutil
 import getpass
 import codecs
+from contextlib import contextmanager
+import pickle
 
 import sqlalchemy
 
@@ -1362,7 +1364,7 @@ def get_icons_path():
             # FIXME: put Linux icons path here
             icons_dir = '/usr/share/icons/hicolor/128x128/apps'
     else:
-        icons_dir = 'gui/ui/images'
+        icons_dir = 'application/ui/images'
     icons_path = ensure_unicode(op.join(path, icons_dir))
     logger.debug("Path to icons %s", icons_path)
     return icons_path
@@ -1373,10 +1375,9 @@ def get_service_start_command():
         path = get_application_path()
         system = get_platform()
         if system == 'Darwin':
-            service = 'pvtbox-service'
+            service = 'Pvtbox-Service'
             command = op.join(
-                path, '..', '..', '..', 'PvtboxService.app',
-                'Contents', 'MacOS', service)
+                path, service)
         elif system == 'Windows':
             service = 'pvtbox-service.exe'
             command = op.join(path, service)
@@ -1789,11 +1790,57 @@ def is_first_launch():
     return not op.exists(init_done_flag_filename)
 
 
+def init_init_done():
+    _make_first_launch_initialization()
+    init_done_filename = get_cfg_filename('init_done')
+    with open(init_done_filename, 'wb') as f:
+        pickle.dump(datetime.now(), f)
+
+
+def clear_init_done():
+    init_done_filename = get_cfg_filename('init_done')
+    with open(init_done_filename, 'wb') as f:
+        pickle.dump(None, f)
+
+
+def get_init_done():
+    init_done_filename = get_cfg_filename('init_done')
+    try:
+        with open(init_done_filename, 'rb') as f:
+                return pickle.load(f)
+    except EOFError:
+        init_init_done()
+        return datetime.now()
+    except Exception as e:
+        logger.warning("Exception (%s) while getting init_done", e)
+        clear_init_done()
+
+
+def _make_first_launch_initialization():
+    if get_platform() == 'Darwin' and not is_portable():
+        subprocess.call(
+            ['pluginkit', '-a', '/Applications/Pvtbox.app/Contents/PlugIns/PvtboxFinderSync.appex'])
+        subprocess.call(
+            ['pluginkit', '-a', '/Applications/Pvtbox.app/Contents/PlugIns/PvtboxShareExtension.appex'])
+        subprocess.call(
+            ['pluginkit', '-e', 'use', '-i', 'net.pvtbox.Pvtbox.PvtboxFinderSync'])
+        subprocess.call(
+            ['pluginkit', '-e', 'use', '-i', 'net.pvtbox.Pvtbox.PvtboxShareExtension'])
+        subprocess.call(
+            ['pluginkit', '-e', 'use', '-i', 'net.pvtbox.Pvtbox'])
+        try:
+            os.makedirs(op.join(HOME_DIR, 'Library', 'Services'), exist_ok=True)
+            os.symlink(
+                '/Applications/Pvtbox.app/Contents/Resources/Copy to Pvtbox sync folder.workflow',
+                op.join(HOME_DIR, 'Library', 'Services', 'Copy to Pvtbox sync folder.workflow'))
+        except:
+            pass
+
+
 def is_portable():
     global portable
     if portable is not None:
         return portable
-    # todo: uncomment
     if is_launched_from_code():
         portable = False
         return portable
@@ -1803,8 +1850,7 @@ def is_portable():
     if platform == 'Windows':
         portable = app_path not in FilePath(get_appdata_dir())
     elif platform == "Darwin":
-        portable = app_path not in FilePath(
-            op.join(HOME_DIR, 'Applications/Pvtbox.app'))
+        portable = app_path not in FilePath('/Applications/Pvtbox.app')
     else:
         portable = app_path not in FilePath('/opt/pvtbox')
     return portable
@@ -1924,6 +1970,15 @@ def get_ipc_address():
         ipc_address = 'ipc:///tmp/pvtbox_'.encode() + username + '.ipc'.encode()
     return ipc_address
 
+
+@contextmanager
+def cwd(path):
+    oldpwd=os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(oldpwd)
 
 # System locale encoding name
 LOCALE_NAME, LOCALE_ENC = get_locale()

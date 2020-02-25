@@ -24,17 +24,19 @@ import traceback
 from hashlib import sha512
 from threading import current_thread
 from uuid import uuid4
+import os.path as op
 
 from PySide2.QtCore import QObject, QMutex
 from PySide2.QtCore import Signal as pyqtSignal
 from requests import Session, exceptions
+from requests_toolbelt.multipart import encoder
 
 from common.ssl_pinning_adapter import SslPinningAdapter
 from common.utils import ensure_unicode, license_type_constant_from_string
 from common.utils import get_device_name, get_platform, \
     get_os_name_and_is_server
 from common.constants import API_URI, API_EVENTS_URI, API_SHARING_URI, \
-    REGULAR_URI
+    API_UPLOAD_URI, REGULAR_URI
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -70,6 +72,7 @@ class Client_API(QObject):
             server_addr=None,
             events_server_addr=None,
             sharing_server_addr=None,
+            upload_server_addr=None,
             parent=None):
 
         logger.debug("Initializing API server client...")
@@ -83,6 +86,8 @@ class Client_API(QObject):
             else API_EVENTS_URI.format(cfg.host)
         self.sharing_server_addr = sharing_server_addr if sharing_server_addr \
             else API_SHARING_URI.format(cfg.host)
+        self.upload_server_addr = upload_server_addr if upload_server_addr \
+            else API_UPLOAD_URI.format(cfg.host)
         self._tracker = tracker
         self.ip_addr = None
         self.cfg = cfg
@@ -361,16 +366,43 @@ class Client_API(QObject):
 
         return self.make_json_data(action=action, data=data)
 
+    def get_upload_request_data(self, fields, callback, force_update=False):
+        """
+        Add auth data to upload request fields given and return
+        multipart/form data object
+
+        @param fields Request data 'fields' [dict]
+        @param callback Callback to be called on file chunk read [Function]
+        @param force_update Instructs to update node sign [bool]
+        @return multipart/form data object [MultipartEncoderMonitor]
+        """
+
+        if not self.node_sign or force_update:
+            self.update_node_sign()
+
+        # Add auth data
+        fields['user_hash'] = self.cfg.user_hash
+        fields['node_hash'] = self.cfg.node_hash
+        fields['node_sign'] = self.node_sign
+
+        e = encoder.MultipartEncoder(fields)
+        m = encoder.MultipartEncoderMonitor(e, callback)
+        return m
+
     def _create_request(self,
                         action,
                         server_addr,
                         data=(),
-                        recurse_max=3):
+                        recurse_max=3,
+                        enrich_data=True,
+                        headers=()):
         data = {} if not data else data
-        encoded = self.get_request_data(action, data)
+        encoded = self.get_request_data(action, data) \
+            if enrich_data else data
 
         try:
-            response = self.make_post(url=server_addr, data=encoded)
+            response = self.make_post(url=server_addr, data=encoded,
+                                      headers=headers)
             response = json.loads(response)
         except Exception as e:
             logger.error("Server response parsing failed with '%s'", e)
@@ -442,7 +474,16 @@ class Client_API(QObject):
                                     data,
                                     recurse_max)
 
-    def make_post(self, url, data):
+    def create_upload_request(self, data, recurse_max=3):
+        headers = {'Content-Type': data.content_type}
+        return self._create_request("",
+                                    self.upload_server_addr,
+                                    data,
+                                    recurse_max,
+                                    enrich_data=False,
+                                    headers=headers)
+
+    def make_post(self, url, data, headers=()):
         try:
             logger.verbose("Sending POST request to '%s' with data '%s'",
                            url, data)
@@ -450,9 +491,11 @@ class Client_API(QObject):
             pass
         session = self._get_or_create_session(current_thread())
         try:
-            _res = session.post(url, data,
-                                timeout=(self.request_timeout,
-                                         self.read_timeout)).text
+            kwargs = dict(timeout=(self.request_timeout,
+                                   self.read_timeout))
+            if headers:
+                kwargs['headers'] = headers
+            _res = session.post(url, data, **kwargs).text
             try:
                 logger.verbose("Server replied: '%s'", _res)
             except AttributeError:
@@ -771,3 +814,54 @@ class Client_API(QObject):
         self.server_addr = API_URI.format(self.cfg.host)
         self.events_server_addr = API_EVENTS_URI.format(self.cfg.host)
         self.sharing_server_addr = API_SHARING_URI.format(self.cfg.host)
+        self.upload_server_addr = API_UPLOAD_URI.format(self.cfg.host)
+
+    # Collaboration settings requests
+
+    def collaboration_info(self, uuid):
+        data = dict(uuid=uuid)
+        return self.create_sharing_request(
+            action="collaboration_info", data=data)
+
+    def colleague_delete(self, uuid, colleague_id):
+        data = dict(uuid=uuid, colleague_id=colleague_id)
+        return self.create_sharing_request(
+            action="colleague_delete", data=data)
+
+    def colleague_edit(self, uuid, colleague_id, access_type):
+        data = dict(uuid=uuid, colleague_id=colleague_id,
+                    access_type=access_type)
+        return self.create_sharing_request(
+            action="colleague_edit", data=data)
+
+    def colleague_add(self, uuid, colleague_email, access_type):
+        data = dict(uuid=uuid, colleague_email=colleague_email,
+                    access_type=access_type)
+        return self.create_sharing_request(
+            action="colleague_add", data=data)
+
+    def collaboration_cancel(self, uuid):
+        data = dict(uuid=uuid)
+        return self.create_sharing_request(
+            action="collaboration_cancel", data=data)
+
+    def collaboration_leave(self, uuid):
+        data = dict(uuid=uuid)
+        return self.create_sharing_request(
+            action="collaboration_leave", data=data)
+
+    # Support requests
+
+    def send_support_message(self, subject, body, log_file_name):
+        data = dict(subject=subject, body=body)
+        if log_file_name:
+            data['log_file_name'] = log_file_name
+        return self.create_request(action="support", data=data)
+
+    def upload_file(self, path, mime_type, callback=lambda m: None):
+        filename = op.basename(path)
+        with open(path, 'rb') as f:
+            fields = {'UploadLogsForm[uploadedFile]': (
+                filename, f, mime_type)}
+            data = self.get_upload_request_data(fields, callback)
+            return self.create_upload_request(data)

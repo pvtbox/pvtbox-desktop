@@ -140,31 +140,18 @@ class Updater(QObject):
                     | 0x00000008,  # DETACHED_PROCESS
                     close_fds=True)
             elif system == 'Darwin':
+                bundle_path = normpath(join(
+                    get_application_path(), '..', '..', '..', '..'))
+                logger.debug("bundle_path: %s", bundle_path)
+                subprocess.call(['ditto', '-xk', self._update_file_path, bundle_path])
+                subprocess.call(['xattr', '-d', '-r', 'com.apple.quarantine', bundle_path])
+                logger.debug("Update completed, restart")
+                remove_file(get_cfg_filename('lock'))
                 if is_portable():
-                    with zipfile.ZipFile(self._update_file_path, "r") as zip:
-                        zip.extractall(path)
-                    bundle_path = normpath(join(
-                        get_application_path(), '..', '..', '..', '..'))
-                    bundle_contents = join(bundle_path, "Contents")
-                    update_path = join(path, "Pvtbox.app")
-                    update_contents = join(update_path, "Contents")
-                    logger.debug("Removing %s...", bundle_contents + "_old")
-                    remove_dir(bundle_contents + "_old")
-                    logger.debug("Moving %s to %s...", bundle_contents, bundle_contents + "_old")
-                    shutil.move(bundle_contents, bundle_contents + "_old")
-                    logger.debug("Moving %s to %s...", update_contents, bundle_path)
-                    shutil.move(update_contents, bundle_path)
-                    logger.debug("Removing %s...", update_path)
-                    remove_dir(update_path)
-                    logger.debug("Removing %s...", bundle_contents + "_old")
-                    remove_dir(bundle_contents + "_old")
-                    logger.debug("Update completed, restart")
-                    remove_file(get_cfg_filename('lock'))
                     launcher_path = normpath(join(bundle_path, "..", "Pvtbox-Mac.command"))
-                    subprocess.call(['open', launcher_path])
                 else:
-                    subprocess.call(
-                        ['installer', '-pkg', self._update_file_path, '-target', 'CurrentUserHomeDirectory'])
+                    launcher_path = bundle_path
+                subprocess.call(['open', launcher_path])
             os.chdir(old_cwd)
             Application.exit()
         except Exception as e:
@@ -199,7 +186,8 @@ class Updater(QObject):
                 self.emit_status()
                 self._download_update_job(req)
                 return True
-        except Exception:
+        except Exception as e:
+            logger.error("Update download error: %s", e)
             pass
 
         logger.warning("Update download failed")
@@ -220,10 +208,7 @@ class Updater(QObject):
         if os == 'Windows':
             suffix = '.exe'
         elif os == 'Darwin':
-            if is_portable():
-                suffix = '.zip'
-            else:
-                suffix = '.pkg'
+            suffix = '.zip'
         else:
             suffix = ''
         update_file = NamedTemporaryFile(
@@ -234,6 +219,7 @@ class Updater(QObject):
         downloaded = 0
         checksum = hashlib.md5()
         self.downloading_update.emit(downloaded, size)
+        logger.debug("Downloading update, %s of %s", downloaded, size)
         try:
             for chunk in req.iter_content(chunk_size=1024 * 1024):
                 if self._stopped:
@@ -245,6 +231,7 @@ class Updater(QObject):
                     downloaded += 1
                     if not self._stopped:
                         self.downloading_update.emit(downloaded, size)
+                        logger.debug("Downloading update, %s of %s", downloaded, size)
 
         except Exception as e:
             logger.error("Error downloading update %s", e)
@@ -258,9 +245,13 @@ class Updater(QObject):
 
             success = checksum.hexdigest() == self._md5
             if success:
+                logger.debug("Update downloaded successfully, hashsum matches")
                 self._update_file_path = update_file.name
                 self._status = UPDATER_STATUS_READY
             else:
+                logger.warning(
+                    "Update download failed: hashsum mismatch, expected: %s, actual: %s",
+                    checksum.hexdigest(), self._md5)
                 self._status = UPDATER_STATUS_DOWNLOAD_ERROR
                 remove_file(update_file.name)
             self.emit_status()
@@ -309,12 +300,12 @@ class Updater(QObject):
             )
         elif os == 'Darwin':
             if is_portable():
-                return '{}/{}/osx/Pvtbox.app.zip'.format(
+                return '{}/{}/osx/Pvtbox-portable.app.zip'.format(
                     self._updates_server_addr,
                     self._update_branch,
                 )
             else:
-                return '{}/{}/osx/Pvtbox.pkg'.format(
+                return '{}/{}/osx/Pvtbox.app.zip'.format(
                     self._updates_server_addr,
                     self._update_branch,
                 )
@@ -327,10 +318,7 @@ class Updater(QObject):
         if os == 'Windows':
             suffix = '.exe'
         elif os == 'Darwin':
-            if is_portable():
-                suffix = '.zip'
-            else:
-                suffix = '.pkg'
+            suffix = '.zip'
         else:
             suffix = ''
         prefix = 'Pvtbox_'

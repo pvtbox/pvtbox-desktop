@@ -311,3 +311,6 @@ class GuiProxy(MessageProxy):
 
     def new_notifications_count(self, count):
         self.send_message("new_notifications_count", [count])
+
+    def show_collaboration_settings(self, rel_path, uuid):
+        self.send_message("show_collaboration_settings", [rel_path, uuid])

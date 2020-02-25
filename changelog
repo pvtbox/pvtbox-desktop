@@ -1,3 +1,13 @@
+ pvtbox (1.9.0-1) stable; urgency=medium
+
+  * Self-hosted support
+  * Settings redesign
+  * Manage collaborations via context menu
+  * Send message with logs to support via Help
+  * Minor improvements, optimizations and bug fixes
+
+ -- Pvtbox <support@pvtbox.net>  Tue, 25 Feb 2020 00:00:00 +0000
+
  pvtbox (1.8.1-1) stable; urgency=medium
 
   * Minor improvements, optimizations and bug fixes

@@ -49,7 +49,7 @@ from common.utils import get_downloads_dir, get_next_name, get_data_dir, \
     create_empty_file, make_dirs, remove_dir, remove_file, ensure_unicode, \
     get_copies_dir, copy_file, get_bases_filename
 from common.constants import DOWNLOAD_PRIORITY_FILE, DELETE, MOVE, \
-    RETRY_DOWNLOAD_TIMEOUT
+    RETRY_DOWNLOAD_TIMEOUT, REGULAR_URI
 from common.file_path import FilePath
 from .share_info_processor import ShareInfoProcessor, FileInfo
 
@@ -756,9 +756,12 @@ class WebshareHandler(object):
         self._dest_uuids[share_hash] = uuid
         self._current_passwd = passwd
 
+        self_hosted = self._cfg.host != REGULAR_URI
+        fingerprint = None if self_hosted else \
+            "86025017022f6dcf9022d6fb867c3bb3bdc621103ddd8e9ed2c891a46d8dd856"
         self._ss_client.ss_connect(
             self._ss_addr, self._ss_port, use_ssl=True, ssl_cert_verify=True,
-            ssl_fingerprint="86025017022f6dcf9022d6fb867c3bb3bdc621103ddd8e9ed2c891a46d8dd856",
+            ssl_fingerprint=fingerprint,
             timeout=20)
 
     def _on_auth_failed(self):

@@ -27,6 +27,8 @@ from .signals import signals
 from .share_path import share_paths, cancel_sharing,  get_relpath, is_folder, \
     update_sync_status, link_copy_success
 from .copy_path import queue_copying
+from .collaboration_settings import collaboration_path_settings
+from .file_info import file_info
 from service.shell_integration import params
 from urllib.parse import quote
 from common.translator import tr
@@ -53,7 +55,7 @@ def share_path_slot(paths):
     '''
     Processes 'share_path' shell command
 
-    @param path Filesystem path [unicode]
+    @param paths Filesystem paths [list]
     '''
 
     # Request path sharing
@@ -191,6 +193,27 @@ def block_path_slot(paths):
             tr("Sharing"))
 
 
+def collaboration_settings_slot(paths):
+    '''
+    Processes 'collaboration_settings' shell command
+
+    @param paths Filesystem paths [list]
+    '''
+
+    # Request opening fo collaboration settings dialog
+    collaboration_path_settings(paths)
+
+
+def file_info_slot(uuids, context):
+    '''
+    Processes 'file_info' shell command
+
+    @param uuids file uuids (1 element list) [list]
+    '''
+
+    file_info(uuids, context)
+
+
 def connect_slots():
     '''
     Connectes slots to shell commands signals
@@ -203,6 +226,8 @@ def connect_slots():
     signals.share_move.connect(share_move_slot)
     signals.email_link.connect(email_link_slot)
     signals.block_path.connect(block_path_slot)
+    signals.collaboration_settings.connect(collaboration_settings_slot)
+    signals.file_info.connect(file_info_slot)
 
     # User messages
     signals.copying_failed.connect(show_copying_failed)
@@ -210,6 +235,8 @@ def connect_slots():
     # Share path
     signals.sync_status_changed.connect(update_sync_status)
     signals.is_saved_to_clipboard.connect(link_copy_success)
+
+    signals.file_info_reply.connect(params.ipc_ws_server.on_file_info)
 
 
 def disconnect_slots():
@@ -224,6 +251,8 @@ def disconnect_slots():
     signals.share_move.disconnect(share_move_slot)
     signals.email_link.disconnect(email_link_slot)
     signals.block_path.disconnect(block_path_slot)
+    signals.collaboration_settings.disconnect(collaboration_settings_slot)
+    signals.file_info.disconnect(file_info_slot)
 
     # User messages
     signals.copying_failed.disconnect(show_copying_failed)
@@ -231,3 +260,5 @@ def disconnect_slots():
     # Share path
     signals.sync_status_changed.disconnect(update_sync_status)
     signals.is_saved_to_clipboard.disconnect(link_copy_success)
+
+    signals.file_info_reply.disconnect(params.ipc_ws_server.on_file_info)

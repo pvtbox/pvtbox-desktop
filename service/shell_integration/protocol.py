@@ -39,8 +39,19 @@ ALLOWED_COMMANDS = (
     'copy_to_sync_dir', 'share_path', 'email_link', 'open_link', 'block_path',
     'sync_dir', 'download_link', 'show', 'is_shared', 'wipe_internal',
     'status_subscribe', 'status_unsubscribe', 'refresh',
-    'share_copy', 'share_move',
+    'share_copy', 'share_move', 'collaboration_settings', 'file_info',
 )
+
+FILE_NOT_FOUND = 0
+FILE_DELETED = 1
+FILE_EXCLUDED = 2
+INVALID_JSON = 3
+FILE_PATH_ERRORS = {
+    FILE_NOT_FOUND: "FILE_NOT_FOUND",
+    FILE_DELETED: "FILE_DELETED",
+    FILE_EXCLUDED: "FILE_EXCLUDED",
+    INVALID_JSON: "INVALID_JSON",
+}
 
 
 def parse_message(encoded):
@@ -138,7 +149,12 @@ def get_files_status_reply(paths, status):
 
 
 def get_clear_path_reply(path):
-    cmd = dict(cmd="status", path=path)
+    cmd = dict(cmd="clear", path=path)
+    return json.dumps(cmd)
+
+
+def get_file_info_reply(path, error, context):
+    cmd = dict(cmd="file_info", path=path, error=error, context=context)
     return json.dumps(cmd)
 
 

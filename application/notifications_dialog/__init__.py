@@ -1,4 +1,3 @@
-# from .TransfersDialog import TransfersDialog
 ###############################################################################
 #   
 #   Pvtbox. Fast and secure file transfer & sync directly across your devices. 

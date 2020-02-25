@@ -99,28 +99,63 @@ class TransfersDialog(object):
 
 
     def _init_ui(self):
+        self._icon_urls = {
+            'add_file': [':/images/transfers/add_file.svg',
+                         ':/images/transfers/add_file_hovered.svg'],
+            'link_insert': [':/images/transfers/link_insert.svg',
+                            ':/images/transfers/link_insert_hovered.svg'],
+            'revert': [':/images/revert.svg',
+                            ':/images/transfers/revert_clicked.svg'],
+            'pause': [':/images/pause.svg',
+                       ':/images/pause_hovered.svg'],
+            'play': [':/images/play.svg',
+                      ':/images/play_hovered.svg'],
+        }
+
+        ui = self._ui
         self._dialog.setWindowFlags(Qt.Dialog)
         self._dialog.setAttribute(Qt.WA_TranslucentBackground)
         self._dialog.setAttribute(Qt.WA_MacFrameworkScaled)
 
-        self._set_file_list_options(self._ui.downloads_list)
-        self._set_file_list_options(self._ui.uploads_list)
-        self._ui.downloads_list.verticalScrollBar().valueChanged.connect(
+        self._set_file_list_options(ui.downloads_list)
+        self._set_file_list_options(ui.uploads_list)
+        ui.downloads_list.verticalScrollBar().valueChanged.connect(
             self.on_downloads_scroll_changed)
-        self._ui.uploads_list.verticalScrollBar().valueChanged.connect(
+        ui.uploads_list.verticalScrollBar().valueChanged.connect(
             self.on_uploads_scroll_changed)
 
-        self._old_main_resize_event = self._ui.centralwidget.resizeEvent
-        self._ui.centralwidget.resizeEvent = self._main_resize_event
+        self._old_main_resize_event = ui.centralwidget.resizeEvent
+        ui.centralwidget.resizeEvent = self._main_resize_event
 
         self._set_fonts()
 
+        ui.add_button.enterEvent = lambda _: \
+            self._enter_leave(ui.add_button, 'add_file')
+        ui.add_button.leaveEvent = lambda _: \
+            self._enter_leave(ui.add_button, 'add_file', False)
+        ui.insert_link_button.enterEvent = lambda _: \
+            self._enter_leave(ui.insert_link_button, 'link_insert')
+        ui.insert_link_button.leaveEvent = lambda _: \
+            self._enter_leave(ui.insert_link_button, 'link_insert', False)
+        ui.revert_all_button.enterEvent = lambda _: \
+            self._enter_leave(ui.revert_all_button, 'revert')
+        ui.revert_all_button.leaveEvent = lambda _: \
+            self._enter_leave(ui.revert_all_button, 'revert', False)
+        ui.pause_all_button.enterEvent = lambda _: \
+            self._enter_leave(ui.pause_all_button,
+                              'play' if self._paused_state == self.PAUSED
+                              else 'pause')
+        ui.pause_all_button.leaveEvent = lambda _: \
+            self._enter_leave(ui.pause_all_button,
+                              'play' if self._paused_state == self.PAUSED
+                              else 'pause', False)
+
         if self._paused_state == self.PAUSED:
-            self._ui.pause_all_button.setText(tr("Resume all"))
-            self._ui.pause_all_button.setIcon(QIcon(":/images/play.svg"))
+            ui.pause_all_button.setText(tr("Resume all"))
+            ui.pause_all_button.setIcon(QIcon(":/images/play.svg"))
         else:
-            self._ui.pause_all_button.setText(tr("Pause all   "))
-            self._ui.pause_all_button.setIcon(QIcon(":/images/pause.svg"))
+            ui.pause_all_button.setText(tr("Pause all   "))
+            ui.pause_all_button.setIcon(QIcon(":/images/pause.svg"))
 
     def _init_charts(self, download_speeds, upload_speeds,
                      speed_chart_capacity):
@@ -391,6 +426,10 @@ class TransfersDialog(object):
             font_size = control.font().pointSize() * self._dp
             if font_size > 0:
                 control.setFont(QFont(font.family(), font_size))
+
+    def _enter_leave(self, button, icon_str, entered=True):
+        icon_url = self._icon_urls[icon_str][int(entered)]
+        button.setIcon(QIcon(icon_url))
 
     def _set_file_list_options(self, file_list):
         file_list.setFocusPolicy(Qt.NoFocus)
@@ -998,14 +1037,15 @@ class TransfersDialog(object):
         self._pause_resume_clicked()
 
     def set_paused_state(self, paused=True):
+        under_mouse = self._ui.pause_all_button.underMouse()
         if paused:
             self._paused_state = self.PAUSED
             self._ui.pause_all_button.setText(tr("Resume all"))
-            self._ui.pause_all_button.setIcon(QIcon(":/images/play.svg"))
+            self._enter_leave(self._ui.pause_all_button, 'play', under_mouse)
         else:
             self._paused_state = self.RESUMING
             self._ui.pause_all_button.setText(tr("Pause all   "))
-            self._ui.pause_all_button.setIcon(QIcon(":/images/pause.svg"))
+            self._enter_leave(self._ui.pause_all_button, 'pause', under_mouse)
 
         self._set_revert_all_enabled()
 
@@ -1047,7 +1087,7 @@ class TransfersDialog(object):
             self.on_downloads_scroll_changed()
             self.on_uploads_scroll_changed()
 
-        width = self._ui.centralwidget.width() // 2
+        width = (self._ui.centralwidget.width() - 6) // 2
         self._ui.downloads_frame.setFixedWidth(width)
         self._ui.uploads_frame.setFixedWidth(width)
         if e.oldSize().width() == self._ui.centralwidget.width():

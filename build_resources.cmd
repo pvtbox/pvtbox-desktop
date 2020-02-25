@@ -12,5 +12,7 @@ call pyside2-uic -o transfers.py application/ui/transfers.ui
 call pyside2-uic -o insert_link.py application/ui/insert_link.ui
 call pyside2-uic -o about.py application/ui/about.ui
 call pyside2-uic -o notifications.py application/ui/notifications.ui
+call pyside2-uic -o support.py application/ui/support.ui
+call pyside2-uic -o collaborations.py application/ui/collaborations.ui
 call protoc --python_out=service/network/browser_sharing/proto --proto_path=service/network/browser_sharing/proto service/network/browser_sharing/proto/proto.proto
 echo Done

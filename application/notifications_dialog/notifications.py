@@ -160,12 +160,11 @@ class Notifications(QObject):
     _new_notifications_count = Signal(int)
     _notifications_got = Signal(list)
 
-    def __init__(self, parent, parent_window, web_api, cfg, dp):
+    def __init__(self, parent, parent_window, cfg, dp):
         QObject.__init__(self, parent)
 
         self._parent = parent
         self._parent_window = parent_window
-        self._web_api = web_api
         self._cfg = cfg
         self._dp = dp
 
@@ -249,7 +248,7 @@ class Notifications(QObject):
         self._querying = True
         notifications = list()
 
-        res = self._web_api.get_notifications(count_to_query, from_id)
+        res = self._parent.web_api.get_notifications(count_to_query, from_id)
         if res and "result" in res:
             if res["result"] == "success":
                 notifications = res['data']
@@ -306,15 +305,14 @@ class Notifications(QObject):
     @qt_run
     def _accept_collaboration_invitation(self, colleague_id):
         self._parent.show_tray_notification(tr("Accepting invitation..."))
-        res = self._web_api.accept_invitation(colleague_id)
+        res = self._parent.web_api.accept_invitation(colleague_id)
 
         msg = tr("Can't send invitation accept")
         if res and "result" in res:
             if res["result"] == "success":
                 msg = tr("Invitation accepted successfully")
             else:
-                if "info" in res:
-                    msg = res.get("info", "")
+                msg = str(res.get("info", msg))
         self._parent.show_tray_notification(msg)
 
     def show_dialog(self):
@@ -344,3 +342,6 @@ class Notifications(QObject):
             return
 
         self._notifications_dialog.close()
+
+    def dialog_opened(self):
+        return self._notifications_dialog is not None

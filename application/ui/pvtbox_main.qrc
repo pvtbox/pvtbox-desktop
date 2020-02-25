@@ -61,7 +61,9 @@
     <file>images/intro_slide3.svg</file>
     <file>images/revert.svg</file>
     <file>images/pause.svg</file>
+    <file>images/pause_hovered.svg</file>
     <file>images/play.svg</file>
+    <file>images/play_hovered.svg</file>
     <file>images/transfers/cancel_active.svg</file>
     <file>images/transfers/cancel_inactive.svg</file>
     <file>images/transfers/cancel_clicked.svg</file>
@@ -72,9 +74,34 @@
     <file>images/transfers/delete_inactive.svg</file>
     <file>images/transfers/delete_clicked.svg</file>
     <file>images/transfers/add_file.svg</file>
+    <file>images/transfers/add_file_hovered.svg</file>
     <file>images/transfers/link_insert.svg</file>
+    <file>images/transfers/link_insert_hovered.svg</file>
     <file>images/bell.png</file>
     <file>images/bell-alert.png</file>
     <file>images/loader.gif</file>
+    <file>images/account.svg</file>
+    <file>images/close.svg</file>
+    <file>images/refresh.svg</file>
+    <file>images/check_radio/check.svg</file>
+    <file>images/check_radio/check_hovered.svg</file>
+    <file>images/check_radio/check_whited.svg</file>
+    <file>images/check_radio/check_marked_hovered.svg</file>
+    <file>images/check_radio/check_intermediate.svg</file>
+    <file>images/check_radio/check_intermediate_hovered.svg</file>
+    <file>images/check_radio/radio.svg</file>
+    <file>images/check_radio/radio_hovered.svg</file>
+    <file>images/check_radio/radio_whited.svg</file>
+    <file>images/check_radio/radio_marked_hovered.svg</file>
+    <file>images/check_radio/chevron_down.svg</file>
+    <file>images/check_radio/chevron_down_hovered.svg</file>
+    <file>images/check_radio/chevron_right.svg</file>
+    <file>images/check_radio/chevron_right_hovered.svg</file>
+    <file>images/settings/folder_sync.svg</file>
+    <file>images/settings/folder_sync_hovered.svg</file>
+    <file>images/settings/logout.svg</file>
+    <file>images/settings/logout_hovered.svg</file>
+    <file>images/settings/pencil.svg</file>
+    <file>images/settings/pencil_hovered.svg</file>
   </qresource>
 </RCC>

@@ -6,111 +6,117 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>578</width>
-    <height>425</height>
+    <width>577</width>
+    <height>426</height>
    </rect>
-  </property>
-  <property name="minimumSize">
-   <size>
-    <width>500</width>
-    <height>400</height>
-   </size>
   </property>
   <property name="windowTitle">
    <string>Settings</string>
   </property>
   <property name="styleSheet">
-   <string notr="true"/>
+   <string notr="true">QTabWidget  QPushButton:hover{color: #ff9144;}</string>
   </property>
-  <property name="locale">
-   <locale language="English" country="UnitedStates"/>
-  </property>
-  <layout class="QGridLayout" name="gridLayout">
-   <property name="margin">
-    <number>0</number>
-   </property>
+  <layout class="QVBoxLayout" name="verticalLayout_5">
    <property name="spacing">
     <number>0</number>
    </property>
-   <item row="0" column="0">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
     <widget class="QFrame" name="centralWidget">
-     <layout class="QVBoxLayout" name="verticalLayout_2">
+     <property name="styleSheet">
+      <string notr="true"/>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_9">
       <item>
-       <layout class="QHBoxLayout" name="pages_headers">
-        <property name="spacing">
-         <number>0</number>
+       <widget class="QTabWidget" name="tabWidget">
+        <property name="enabled">
+         <bool>true</bool>
         </property>
-        <item>
-         <widget class="QPushButton" name="general_button">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>50</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>General</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-          <property name="checked">
-           <bool>false</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="account_button">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>50</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>Account</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="network_button">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>50</height>
-           </size>
-          </property>
-          <property name="text">
-           <string>Network</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
-      <item>
-       <widget class="QStackedWidget" name="pages">
+        <property name="font">
+         <font>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QTabWidget::pane { 
+    border: 1px solid #aaaaaa;
+	margin-top: -1px;
+}
+QTabWidget::tab-bar {
+    alignment: left;
+}
+QTabBar::tab{height: 40px; min-width: 100px; border: 1px solid #aaaaaa; 
+color: #555555; 
+border-bottom-color: #aaaaaa;  
+border-top-left-radius: 4px;
+border-top-right-radius: 4px;
+margin-right: -1px;
+padding: 2px;
+background-color: #ffffff;
+}
+QTabBar::tab:selected {
+	color:  #ff9144;
+    border-color: #ff9144;
+    border-bottom-color:#ffffff ;
+    background-color: #ffffff;
+}
+QTabBar::tab:last {
+    margin-right: 0; 
+}
+QTabBar::tab:hover {color: #ff9144; background-color: #ffffff  }
+QTabBar::tab:hover:selected {color: #ff9144; background-color: #ffffff  }
+</string>
+        </property>
         <property name="currentIndex">
          <number>1</number>
         </property>
-        <widget class="QWidget" name="general_page">
-         <layout class="QVBoxLayout" name="verticalLayout_3">
+        <widget class="QWidget" name="tab_general">
+         <property name="styleSheet">
+          <string notr="true">background-color: #ffffff;</string>
+         </property>
+         <attribute name="title">
+          <string>General</string>
+         </attribute>
+         <layout class="QVBoxLayout" name="verticalLayout_7">
+          <property name="spacing">
+           <number>20</number>
+          </property>
           <property name="leftMargin">
            <number>50</number>
+          </property>
+          <property name="topMargin">
+           <number>20</number>
           </property>
           <property name="rightMargin">
            <number>50</number>
           </property>
-          <property name="spacing">
+          <property name="bottomMargin">
            <number>20</number>
           </property>
           <item>
            <widget class="QCheckBox" name="autologin_checkbox">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Automatically login on application launch</string>
             </property>
@@ -118,6 +124,11 @@
           </item>
           <item>
            <widget class="QCheckBox" name="startup_checkbox">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Launch application on startup</string>
             </property>
@@ -125,6 +136,11 @@
           </item>
           <item>
            <widget class="QCheckBox" name="tracking_checkbox">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Send anonymous data to improve service</string>
             </property>
@@ -132,6 +148,11 @@
           </item>
           <item>
            <widget class="QCheckBox" name="autoupdate_checkbox">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Automatically check for application updates</string>
             </property>
@@ -139,6 +160,11 @@
           </item>
           <item>
            <widget class="QCheckBox" name="download_backups_checkBox">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Let the system make backups of your files</string>
             </property>
@@ -146,20 +172,25 @@
           </item>
           <item>
            <widget class="QCheckBox" name="disable_logging_checkBox">
+            <property name="font">
+             <font>
+              <pointsize>9</pointsize>
+             </font>
+            </property>
             <property name="text">
              <string>Disable debug logs on this device</string>
             </property>
            </widget>
           </item>
           <item>
-           <spacer name="verticalSpacer">
+           <spacer name="verticalSpacer_4">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
               <width>20</width>
-              <height>40</height>
+              <height>50</height>
              </size>
             </property>
            </spacer>
@@ -174,24 +205,58 @@
                 <height>16777215</height>
                </size>
               </property>
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
               <property name="text">
                <string>Language</string>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QComboBox" name="language_comboBox"/>
+             <widget class="QComboBox" name="language_comboBox">
+              <property name="enabled">
+               <bool>true</bool>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>20</height>
+               </size>
+              </property>
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">QComboBox {border: 1px solid #555555;}
+QComboBox:!enabled {border: 1px solid #aaaaaa; }</string>
+              </property>
+             </widget>
             </item>
            </layout>
           </item>
          </layout>
         </widget>
-        <widget class="QWidget" name="account_page">
-         <layout class="QVBoxLayout" name="verticalLayout_4">
+        <widget class="QWidget" name="tab_account">
+         <property name="styleSheet">
+          <string notr="true">background-color: #ffffff; border: 0;</string>
+         </property>
+         <attribute name="title">
+          <string>Account</string>
+         </attribute>
+         <layout class="QVBoxLayout" name="verticalLayout_6">
+          <property name="topMargin">
+           <number>20</number>
+          </property>
           <item>
            <widget class="QLabel" name="location_label">
             <property name="font">
              <font>
+              <pointsize>9</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
@@ -203,23 +268,58 @@
           </item>
           <item>
            <layout class="QHBoxLayout" name="location_layout">
+            <property name="spacing">
+             <number>10</number>
+            </property>
+            <property name="leftMargin">
+             <number>2</number>
+            </property>
+            <property name="topMargin">
+             <number>2</number>
+            </property>
+            <property name="rightMargin">
+             <number>2</number>
+            </property>
+            <property name="bottomMargin">
+             <number>2</number>
+            </property>
             <item>
              <widget class="QLineEdit" name="location_edit">
               <property name="enabled">
                <bool>false</bool>
               </property>
-              <property name="readOnly">
-               <bool>true</bool>
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
               </property>
               <property name="styleSheet">
                <string notr="true">QLineEdit {background-color: #e9e9e9;}</string>
+              </property>
+              <property name="readOnly">
+               <bool>true</bool>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QPushButton" name="location_button">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
               <property name="text">
                <string>Change</string>
+              </property>
+              <property name="icon">
+               <iconset resource="pvtbox_main.qrc">
+                <normaloff>:/images/settings/pencil.svg</normaloff>:/images/settings/pencil.svg</iconset>
+              </property>
+              <property name="flat">
+               <bool>false</bool>
               </property>
              </widget>
             </item>
@@ -229,58 +329,69 @@
            <widget class="QLabel" name="account_type_header">
             <property name="font">
              <font>
+              <pointsize>9</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
             </property>
+            <property name="visible">
+             <bool>false</bool>
+            </property>
             <property name="text">
              <string>Account type</string>
-            </property>
-            <property name="visible">
-             <bool>False</bool>
             </property>
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout">
+           <layout class="QHBoxLayout" name="_3">
             <item>
              <widget class="QLabel" name="account_type">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
               <property name="visible">
-               <bool>False</bool>
+               <bool>false</bool>
               </property>
              </widget>
             </item>
             <item>
              <widget class="QLabel" name="account_upgrade">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
               <property name="visible">
-               <bool>False</bool>
+               <bool>false</bool>
               </property>
              </widget>
             </item>
             <item>
-           <spacer>
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>0</width>
-              <height>0</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
+             <spacer>
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>0</width>
+                <height>0</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
            </layout>
           </item>
           <item>
-           <spacer name="verticalSpacer_2">
+           <spacer name="verticalSpacer_5">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
               <width>20</width>
-              <height>40</height>
+              <height>148</height>
              </size>
             </property>
            </spacer>
@@ -289,6 +400,7 @@
            <widget class="QLabel" name="selective_sync_label">
             <property name="font">
              <font>
+              <pointsize>9</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
@@ -303,23 +415,50 @@
             <property name="spacing">
              <number>6</number>
             </property>
+            <property name="leftMargin">
+             <number>2</number>
+            </property>
+            <property name="topMargin">
+             <number>2</number>
+            </property>
+            <property name="rightMargin">
+             <number>2</number>
+            </property>
+            <property name="bottomMargin">
+             <number>2</number>
+            </property>
             <item>
-             <widget class="QLabel" name="none_label">
-              <property name="font">
-               <font>
-                <weight>75</weight>
-                <bold>true</bold>
-               </font>
+             <spacer name="horizontalSpacer">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
               </property>
-              <property name="text">
-               <string/>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
               </property>
-             </widget>
+             </spacer>
             </item>
             <item>
              <widget class="QPushButton" name="selective_sync_button">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
               <property name="text">
                <string>Choose folders...</string>
+              </property>
+              <property name="icon">
+               <iconset resource="pvtbox_main.qrc">
+                <normaloff>:/images/settings/folder_sync.svg</normaloff>:/images/settings/folder_sync.svg</iconset>
+              </property>
+              <property name="flat">
+               <bool>false</bool>
               </property>
              </widget>
             </item>
@@ -329,6 +468,7 @@
            <widget class="QLabel" name="user_label">
             <property name="font">
              <font>
+              <pointsize>9</pointsize>
               <weight>75</weight>
               <bold>true</bold>
              </font>
@@ -340,10 +480,23 @@
           </item>
           <item>
            <layout class="QHBoxLayout" name="user_layout">
+            <property name="leftMargin">
+             <number>2</number>
+            </property>
+            <property name="topMargin">
+             <number>2</number>
+            </property>
+            <property name="rightMargin">
+             <number>2</number>
+            </property>
+            <property name="bottomMargin">
+             <number>2</number>
+            </property>
             <item>
              <widget class="QLabel" name="email_label">
               <property name="font">
                <font>
+                <pointsize>9</pointsize>
                 <weight>75</weight>
                 <bold>true</bold>
                </font>
@@ -354,9 +507,40 @@
              </widget>
             </item>
             <item>
+             <spacer name="horizontalSpacer_2">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
              <widget class="QPushButton" name="logout_button">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="cursor">
+               <cursorShape>PointingHandCursor</cursorShape>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">botder: 0;</string>
+              </property>
               <property name="text">
                <string>Logout from this computer</string>
+              </property>
+              <property name="icon">
+               <iconset resource="pvtbox_main.qrc">
+                <normaloff>:/images/settings/logout.svg</normaloff>:/images/settings/logout.svg</iconset>
+              </property>
+              <property name="flat">
+               <bool>false</bool>
               </property>
              </widget>
             </item>
@@ -364,8 +548,17 @@
           </item>
          </layout>
         </widget>
-        <widget class="QWidget" name="network_page">
-         <layout class="QVBoxLayout" name="verticalLayout">
+        <widget class="QWidget" name="tab_network">
+         <property name="styleSheet">
+          <string notr="true">background-color: #ffffff;</string>
+         </property>
+         <attribute name="title">
+          <string>Network</string>
+         </attribute>
+         <layout class="QVBoxLayout" name="verticalLayout_8">
+          <property name="topMargin">
+           <number>20</number>
+          </property>
           <item>
            <layout class="QHBoxLayout" name="speed_limits_layout">
             <item>
@@ -374,6 +567,7 @@
                <widget class="QLabel" name="download_limit_label">
                 <property name="font">
                  <font>
+                  <pointsize>9</pointsize>
                   <weight>75</weight>
                   <bold>true</bold>
                  </font>
@@ -385,12 +579,14 @@
               </item>
               <item>
                <widget class="QRadioButton" name="download_auto_radioButton">
+                <property name="font">
+                 <font>
+                  <pointsize>9</pointsize>
+                 </font>
+                </property>
                 <property name="text">
                  <string>Unlimited</string>
                 </property>
-                <attribute name="buttonGroup">
-                 <string notr="true">download_buttonGroup</string>
-                </attribute>
                </widget>
               </item>
               <item>
@@ -400,16 +596,23 @@
                 </property>
                 <item>
                  <widget class="QRadioButton" name="download_limit_radioButton">
+                  <property name="font">
+                   <font>
+                    <pointsize>9</pointsize>
+                   </font>
+                  </property>
                   <property name="text">
                    <string>Limit to:</string>
                   </property>
-                  <attribute name="buttonGroup">
-                   <string notr="true">download_buttonGroup</string>
-                  </attribute>
                  </widget>
                 </item>
                 <item>
                  <widget class="QLineEdit" name="download_limit_edit">
+                  <property name="font">
+                   <font>
+                    <pointsize>9</pointsize>
+                   </font>
+                  </property>
                   <property name="inputMethodHints">
                    <set>Qt::ImhDigitsOnly</set>
                   </property>
@@ -417,6 +620,11 @@
                 </item>
                 <item>
                  <widget class="QLabel" name="download_kbs">
+                  <property name="font">
+                   <font>
+                    <pointsize>9</pointsize>
+                   </font>
+                  </property>
                   <property name="text">
                    <string>KB/s</string>
                   </property>
@@ -432,6 +640,7 @@
                <widget class="QLabel" name="uload_limit_label">
                 <property name="font">
                  <font>
+                  <pointsize>9</pointsize>
                   <weight>75</weight>
                   <bold>true</bold>
                  </font>
@@ -443,28 +652,43 @@
               </item>
               <item>
                <widget class="QRadioButton" name="upload_auto_radioButton">
+                <property name="font">
+                 <font>
+                  <pointsize>9</pointsize>
+                 </font>
+                </property>
                 <property name="text">
                  <string>Unlimited</string>
                 </property>
                 <attribute name="buttonGroup">
-                 <string notr="true">upload_buttonGroup</string>
+                 <string notr="true">buttonGroup</string>
                 </attribute>
                </widget>
               </item>
               <item>
-               <layout class="QHBoxLayout" name="upload_limit_layout_2">
+               <layout class="QHBoxLayout" name="upload_speed_layout">
                 <item>
                  <widget class="QRadioButton" name="upload_limit_radioButton">
+                  <property name="font">
+                   <font>
+                    <pointsize>9</pointsize>
+                   </font>
+                  </property>
                   <property name="text">
                    <string>Limit to:</string>
                   </property>
                   <attribute name="buttonGroup">
-                   <string notr="true">upload_buttonGroup</string>
+                   <string notr="true">buttonGroup</string>
                   </attribute>
                  </widget>
                 </item>
                 <item>
                  <widget class="QLineEdit" name="upload_limit_edit">
+                  <property name="font">
+                   <font>
+                    <pointsize>9</pointsize>
+                   </font>
+                  </property>
                   <property name="inputMethodHints">
                    <set>Qt::ImhDigitsOnly</set>
                   </property>
@@ -472,6 +696,11 @@
                 </item>
                 <item>
                  <widget class="QLabel" name="upload_kbs">
+                  <property name="font">
+                   <font>
+                    <pointsize>9</pointsize>
+                   </font>
+                  </property>
                   <property name="text">
                    <string>KB/s</string>
                   </property>
@@ -484,14 +713,14 @@
            </layout>
           </item>
           <item>
-           <spacer name="verticalSpacer_3">
+           <spacer name="verticalSpacer_6">
             <property name="orientation">
              <enum>Qt::Vertical</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
               <width>20</width>
-              <height>40</height>
+              <height>253</height>
              </size>
             </property>
            </spacer>
@@ -502,6 +731,14 @@
       </item>
       <item>
        <widget class="QDialogButtonBox" name="buttonBox">
+        <property name="font">
+         <font>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true"/>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -515,10 +752,11 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="pvtbox_main.qrc"/>
+ </resources>
  <connections/>
  <buttongroups>
-  <buttongroup name="upload_buttonGroup"/>
-  <buttongroup name="download_buttonGroup"/>
+  <buttongroup name="buttonGroup"/>
  </buttongroups>
 </ui>

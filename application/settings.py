@@ -24,8 +24,9 @@ import shutil
 import os.path as op
 
 from PySide2.QtCore import Qt, QRegExp, QTimer
-from PySide2.QtGui import QRegExpValidator, QIcon
-from PySide2.QtWidgets import QDialog, QFrame, \
+from PySide2.QtGui import QRegExpValidator, QIcon, QFont
+from PySide2.QtWidgets import QDialog, QFrame, QLabel, QLineEdit, \
+    QRadioButton, QCheckBox, QPushButton, \
     QFileDialog, QProgressDialog
 
 from application.sync_dir_migration import SyncDirMigration
@@ -60,7 +61,7 @@ class Settings(object):
         pass
 
     def __init__(self, cfg, main_cfg, start_service, exit_service,
-                 parent=None, size=None, migrate=False):
+                 parent=None, size=None, migrate=False, dp=1):
         super(Settings, self).__init__()
         self._cfg = cfg
         self._main_cfg = main_cfg
@@ -68,6 +69,7 @@ class Settings(object):
         self._exit_service = exit_service
         self._parent = parent
         self._size = size
+        self._dp = dp
         self._dialog = QDialog(parent)
         self._dialog.setWindowIcon(QIcon(':/images/icon.png'))
         self._dialog.setAttribute(Qt.WA_MacFrameworkScaled)
@@ -81,7 +83,6 @@ class Settings(object):
         try:
             self._ui.account_type.setText(
                 license_display_name_from_constant(self._cfg.license_type))
-            self._ui.account_type.adjustSize()
             self._ui.account_type.setVisible(True)
             self._ui.account_type_header.setVisible(True)
             self._ui.account_upgrade.setVisible(True)
@@ -90,7 +91,8 @@ class Settings(object):
         upgrade_license_types = (FREE_LICENSE, FREE_TRIAL_LICENSE)
         if self._cfg.license_type in upgrade_license_types:
             self._ui.account_upgrade.setText(
-                '<a href="{}">{}</a>'.format(GET_PRO_URI, tr('Upgrade')))
+                '<a href="{}">{}</a>'.format(
+                    GET_PRO_URI.format(self._cfg.host), tr('Upgrade')))
             self._ui.account_upgrade.setTextFormat(Qt.RichText)
             self._ui.account_upgrade.setTextInteractionFlags(
                 Qt.TextBrowserInteraction)
@@ -106,7 +108,8 @@ class Settings(object):
         self._ui.language_comboBox.setEnabled(False)
 
         self._connect_slots()
-        self._ui.general_button.click()
+        self._set_fonts()
+        self._ui.tabWidget.setCurrentIndex(0)
 
         # Selective sync dialog results
         self._excluded_dirs = None
@@ -124,12 +127,6 @@ class Settings(object):
     def _connect_slots(self):
         ui = self._ui
 
-        ui.general_button.clicked.connect(
-            lambda: self._set_page(ui.general_button, ui.general_page))
-        ui.account_button.clicked.connect(
-            lambda: self._set_page(ui.account_button, ui.account_page))
-        ui.network_button.clicked.connect(
-            lambda: self._set_page(ui.network_button, ui.network_page))
         ui.logout_button.clicked.connect(self._logout)
 
         ui.download_auto_radioButton.clicked.connect(
@@ -153,6 +150,45 @@ class Settings(object):
         ui.location_button.clicked.connect(
             self._on_sync_folder_location_button_clicked)
 
+        ui.location_button.enterEvent = lambda _: \
+            ui.location_button.setIcon(QIcon(
+                ':/images/settings/pencil_hovered.svg'))
+        ui.location_button.leaveEvent = lambda _: \
+            ui.location_button.setIcon(QIcon(
+                ':/images/settings/pencil.svg'))
+        ui.selective_sync_button.enterEvent = lambda _: \
+            ui.selective_sync_button.setIcon(QIcon(
+                ':/images/settings/folder_sync_hovered.svg'))
+        ui.selective_sync_button.leaveEvent = lambda _: \
+            ui.selective_sync_button.setIcon(QIcon(
+                ':/images/settings/folder_sync.svg'))
+        ui.logout_button.enterEvent = lambda _: \
+            ui.logout_button.setIcon(QIcon(
+                ':/images/settings/logout_hovered.svg'))
+        ui.logout_button.leaveEvent = lambda _: \
+            ui.logout_button.setIcon(QIcon(
+                ':/images/settings/logout.svg'))
+
+    def _set_fonts(self):
+        ui = self._ui
+        controls = [ui.tabWidget, ui.language_comboBox]
+        controls.extend([c for c in ui.tabWidget.findChildren(QLabel)])
+        controls.extend(
+            [c for c in ui.tabWidget.findChildren(QLineEdit)])
+        controls.extend(
+            [c for c in ui.tabWidget.findChildren(QPushButton)])
+        controls.extend([c for c in ui.tabWidget.findChildren(QCheckBox)])
+        controls.extend(
+            [c for c in ui.tabWidget.findChildren(QRadioButton)])
+
+        for control in controls:
+            font = control.font()
+            font_size = control.font().pointSize() * self._dp
+            if font_size > 0:
+                control_font = QFont(font.family(), font_size)
+                control_font.setBold(font.bold())
+                control.setFont(control_font)
+
     def _logout(self):
         userAnswer = msgbox(
             tr('Keep local files on device?'),
@@ -173,14 +209,6 @@ class Settings(object):
 
         self._dialog.reject()
 
-    def _set_page(self, button, page):
-        ui = self._ui
-
-        for btn in (ui.general_button, ui.account_button, ui.network_button):
-            btn.setChecked(btn == button)
-
-        ui.pages.setCurrentWidget(page)
-
     def show(self, on_finished):
         def finished():
             if self._dialog.result() == QDialog.Accepted:
@@ -190,7 +218,7 @@ class Settings(object):
 
         self._setup_to_ui()
         if self._migrate:
-            self._set_page(self._ui.account_button, self._ui.account_page)
+            self._ui.tabWidget.setCurrentIndex(1)   # Account page
             QTimer.singleShot(100, self._on_sync_folder_location_button_clicked)
         self._dialog.finished.connect(finished)
         self._dialog.raise_()

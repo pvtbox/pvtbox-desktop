@@ -1120,14 +1120,20 @@ class FileEventsDB(object):
             path = ''
             deleted = excluded = False
         else:
-            folder = session.query(File)\
-                .filter(File.uuid == uuid).one_or_none()
-            if not folder:
-                return None, None, None
-            path = folder.path
-            deleted = folder.is_deleted
-            excluded = folder.excluded
+            path, \
+            deleted, \
+            excluded = self.get_path_deleted_excluded_by_uuid(uuid, session)
         return path, deleted, excluded
+
+    @with_session
+    def get_path_deleted_excluded_by_uuid(self, uuid, session=None):
+        file = session.query(File) \
+            .filter(File.uuid == uuid) \
+            .one_or_none()
+        if not file:
+            return None, None, None
+
+        return file.path, file.is_deleted, file.excluded
 
     def db_file_exists(self):
         return exists(self._db_file) and getsize(self._db_file) > 0

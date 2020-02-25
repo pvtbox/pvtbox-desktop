@@ -27,7 +27,7 @@ from common.utils import get_platform, HOME_DIR, ensure_unicode, make_dirs, get_
 from .protocol import \
     parse_message, get_sync_dir_reply, emit_signal, create_command, \
     get_is_sharing_reply, get_shared_reply, get_files_status_reply, \
-    get_clear_path_reply, get_share_copy_move_reply
+    get_clear_path_reply, get_share_copy_move_reply, get_file_info_reply
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -75,6 +75,9 @@ class IPCWebSocketProtocol(WebSocketServerProtocol):
         elif cmd in ('share_copy', 'share_move'):
             emit_signal(cmd, paths, context)
             return
+        elif cmd in('file_info', ):
+            emit_signal(cmd, [path], context)
+            return
 
         # Process other commands
         try:
@@ -120,10 +123,15 @@ class IPCWebSocketServer(object):
         self._loop.call_soon_threadsafe(self._broadcast_share)
 
     def on_files_status(self, client, paths, status):
-        self._loop.call_soon_threadsafe(self._send_files_status, client, paths, status)
+        self._loop.call_soon_threadsafe(
+            self._send_files_status, client, paths, status)
 
     def on_clear_path(self, client, path):
         self._loop.call_soon_threadsafe(self._send_clear_path, client, path)
+
+    def on_file_info(self, path, error, context):
+        self._loop.call_soon_threadsafe(
+            self._broadcast_file_info, path, error, context)
 
     def on_paths_links(self, paths, links, context, move=False):
         self._loop.call_soon_threadsafe(
@@ -163,6 +171,12 @@ class IPCWebSocketServer(object):
             if client.peer == client_id:
                 client.sendMessage(msg)
                 return
+
+    def _broadcast_file_info(self, path, error, context):
+        clients = getattr(self._factory, 'client_connections', set())
+        msg = get_file_info_reply(path, error, context).encode()
+        for client in clients:
+            client.sendMessage(msg)
 
     def _broadcast_paths_links(self,  paths, links, context, move):
         clients = getattr(self._factory, 'client_connections', set())
