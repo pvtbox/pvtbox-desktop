@@ -163,8 +163,12 @@ class LocalEventStrategy(EventStrategy):
 
     def _delete_occured_move_events(self, session):
         if not self.event.file.events[0].server_event_id:
-            self.event.file.events[0].file_name = self.event.file_name
+            prev_event = self.event.file.events[0]
+            file_name = self.event.file_name
             session.delete(self.event)
+            session.flush()
+            prev_event.file_name = file_name
+            prev_event.file.event_id = prev_event.id
             session.commit()
             raise EventAlreadyAdded()
 
@@ -177,17 +181,24 @@ class LocalEventStrategy(EventStrategy):
         if deleted_count == 0:
             return deleted_count
 
-        prev_event = session.query(Event) \
+        prev_events = session.query(Event) \
             .filter(Event.file_id == self.file_id) \
             .filter(Event.server_event_id.isnot(None)) \
             .filter(Event.state.in_(["sent", "downloaded", "received"])) \
             .order_by(Event.id.desc()) \
-            .limit(1) \
-            .one_or_none()
+            .all()
+        prev_event = prev_events[0] if prev_events else None
         if prev_event is not None and \
                 prev_event.file_name == self.event.file_name and \
                 prev_event.folder_uuid == self.event.folder_uuid:
             session.delete(self.event)
+            session.flush()
+            old_event_id = None
+            for ev in prev_events:
+                if ev.state in ["sent", "downloaded"]:
+                    old_event_id = ev.id
+                    break
+            prev_event.file.event_id = old_event_id
             session.commit()
             raise EventAlreadyAdded()
         return deleted_count
