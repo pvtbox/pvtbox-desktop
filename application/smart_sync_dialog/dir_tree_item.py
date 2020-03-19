@@ -56,6 +56,9 @@ class DirTreeItem(object):
         self._tristate = tristate
         self._checked = checked
         self._is_root = is_root
+        self._is_offline = self._tree_model.is_path_offline(self._fullpath)
+        self._will_be_offline = False
+        self._will_be_online = False
 
         self._children_fetched = False
         if LOGGING_ENABLED:
@@ -72,16 +75,28 @@ class DirTreeItem(object):
         if update_ancestors:
             self._update_checked()
 
+    def is_offline(self):
+        return self._is_offline
+
+    def will_be_offline(self):
+        return self._will_be_offline
+
+    def set_will_be_offline(self, value):
+        self._will_be_offline = value
+
+    def will_be_online(self):
+        return self._will_be_online
+
+    def set_will_be_online(self, value):
+        self._will_be_online = value
+
     def _update_checked(self):
         # Initial item init
         if self._checked is None:
-            # Item path is excluded
-            if self._tree_model.is_path_excluded(self._fullpath):
-                self._checked = False
-                self._update_ancestors()
-            elif self._parent_item:
-                self._checked = self._parent_item.is_checked() or \
-                    self._parent_item.is_tristate()
+            # Item path is offline
+            if self._is_offline:
+                self._checked = True
+            self._update_ancestors()
         # Item checked state changed
         else:
             self.set_tristate(False)
@@ -96,14 +111,22 @@ class DirTreeItem(object):
     def _update_ancestors(self):
         # Update parent items
         for parent_item in self.ancestors():
-            if parent_item.check_all_children_checked():
-                # Set parent to be checked
-                parent_item.set_checked(True, update_ancestors=False)
-                parent_item.set_tristate(False)
+            if parent_item.check_any_children_checked_or_tristate():
+                if parent_item.check_any_children_not_checked() \
+                        or parent_item.will_be_online() or not parent_item.is_offline():
+                    parent_item.set_checked(False, update_ancestors=False)
+                    parent_item.set_tristate(True)
+                elif parent_item.is_offline():
+                    parent_item.set_checked(True, update_ancestors=False)
+                    parent_item.set_tristate(False)
             else:
-                # Set parent to be tristate
-                parent_item.set_checked(False, update_ancestors=False)
-                parent_item.set_tristate(True)
+                if (parent_item.is_offline() or parent_item.will_be_offline()) \
+                        and not parent_item.will_be_online():
+                    parent_item.set_checked(False, update_ancestors=False)
+                    parent_item.set_tristate(True)
+                else:
+                    parent_item.set_checked(False, update_ancestors=False)
+                    parent_item.set_tristate(False)
             self._tree_model.emit_data_changed(parent_item)
 
     def __repr__(self):
@@ -178,7 +201,9 @@ class DirTreeItem(object):
                 continue
             fullpath = op.join(self._fullpath, subdir)
             if fullpath not in self._child_paths:
-                self.append_child_item(DirTreeItem(fullpath, subdir, self))
+                child = DirTreeItem(fullpath, subdir, self)
+                self.append_child_item(child)
+                child.fetch_subdirs()
 
         self._children_fetched = True
         self._tree_model.emit_data_changed(self)
@@ -207,12 +232,8 @@ class DirTreeItem(object):
         for c in iter_grandchildren:
             yield c
 
-    def check_all_children_checked(self):
-        """
-        Returns True if all children items are checked
+    def check_any_children_checked_or_tristate(self):
+        return any([c.is_checked() or c.is_tristate() for c in self._child_items])
 
-        @return Flag value [bool]
-        """
-
-        checked = [c for c in self._child_items if c.is_checked() and not c.is_tristate()]
-        return len(checked) == len(self._child_items)
+    def check_any_children_not_checked(self):
+        return any([not c.is_checked() for c in self._child_items])

@@ -39,32 +39,16 @@ logger.addHandler(logging.NullHandler())
 
 class ConfigLoader:
 
-    def __init__(self, config_file):
+    def __init__(self, config_file, check=True):
         # Emitted when some parameter values has changed
         # dict: name -> namedtuple(old_value, new_value)
         self.settings_changed = Signal(dict)
 
         self.encrypt = True
         self.config_file_name = config_file
-
-        checked = False
-        while not checked:
-            try:
-                self.config, need_sync = self.read_config_file()
-                self.check()
-                checked = True
-                if need_sync:
-                    self.sync()
-            except AssertionError as e:
-                logger.warning(
-                    "Assertion error while loading config: %s, using default value", e)
-                self.config[str(e)] = self.default_config()[str(e)]
-                self.sync()
-            except (KeyError, ValueError, IOError) as e:
-                logger.warning(
-                    "Error while loading config: %s, using default config", e)
-                self.config = self.default_config()
-                self.sync()
+        self.config = None
+        self._defaults = set()
+        self.refresh(check=check)
 
     def read_config_file(self):
         need_sync = False
@@ -136,8 +120,32 @@ class ConfigLoader:
             copies_logging=True,
             excluded_dirs_applied=(),  # List of excluded dirs, applied in DB
             host=REGULAR_URI,
-            tracking_address='https://tracking.pvtbox.net:443/',
+            tracking_address='https://tracking.pvtbox.net:443/1/',
+            smart_sync=True,
         )
+
+    def refresh(self, check=True):
+        checked = False
+        while not checked:
+            try:
+                self.config, need_sync = self.read_config_file()
+                if check:
+                    self.check()
+                checked = True
+                if need_sync:
+                    self.sync()
+            except AssertionError as e:
+                logger.warning(
+                    "Assertion error while loading config: %s, using default value", e)
+                self.config[str(e)] = self.default_config()[str(e)]
+                self._defaults.add(str(e))
+                self.sync()
+            except (KeyError, ValueError, IOError) as e:
+                logger.warning(
+                    "Error while loading config: %s, using default config", e)
+                self.config = self.default_config()
+                self._defaults.update(self.config.keys())
+                self.sync()
 
     def sync(self):
         config = self.config.copy()
@@ -229,6 +237,9 @@ class ConfigLoader:
         assert isinstance(
             self.config.get('tracking_address'), str), \
             'tracking_address'
+        assert isinstance(
+            self.config.get('smart_sync'), bool), \
+            'smart_sync'
 
         # if new key is added to config, it's mandatory to use 'get(key)'
         # here, not pure  self.config[key]
@@ -295,8 +306,14 @@ class ConfigLoader:
     def get_filename(self):
         return self.config_file_name
 
+    def get_defaults_applied(self, clear=True):
+        defaults = self._defaults.copy()
+        if clear:
+            self._defaults.clear()
+        return defaults
 
-def load_config(config_file='config.json', config_cls=ConfigLoader):
+
+def load_config(config_file='config.json', config_cls=ConfigLoader, check=True):
     '''
     Loads program configuration into ConfigLoader instanse.
     Configuration is assumed to be stored in JSON format.
@@ -311,5 +328,5 @@ def load_config(config_file='config.json', config_cls=ConfigLoader):
     config_file = get_cfg_filename(config_file)
     logger.info(
         "Loading program configuration from '%s'", config_file)
-    cfg = config_cls(config_file)
+    cfg = config_cls(config_file, check=check)
     return cfg

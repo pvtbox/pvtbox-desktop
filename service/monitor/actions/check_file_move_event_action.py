@@ -22,7 +22,7 @@
 ###############################################################################
 import os.path as op
 
-from common.constants import MOVE, MODIFY, CREATE
+from common.constants import MOVE, MODIFY, CREATE, FILE_LINK_SUFFIX
 from service.monitor.actions.action_base import ActionBase
 from service.monitor.fs_event import FsEvent
 from common.file_path import FilePath
@@ -40,10 +40,14 @@ class CheckFileMoveEventAction(ActionBase):
         return fs_event.event_type in (MOVE, )
 
     def _process(self, fs_event):
+        src_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] if fs_event.is_link \
+            else fs_event.src
+        dst_path = fs_event.dst[: -len(FILE_LINK_SUFFIX)] if fs_event.is_link \
+            else fs_event.dst
         if not self._check_file_exists_on_fs(fs_event.src) \
-                and self._check_file_exists_in_storage(fs_event.src) \
+                and self._check_file_exists_in_storage(src_path) \
                 and self._check_file_exists_on_fs(fs_event.dst) \
-                and not self._check_file_exists_in_storage(fs_event.dst):
+                and not self._check_file_exists_in_storage(dst_path):
             self.event_passed(fs_event)
             if not fs_event.is_dir:
                 self.event_spawned(FsEvent(

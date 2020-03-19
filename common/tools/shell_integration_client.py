@@ -95,6 +95,7 @@ def send_copy_to_sync_dir(paths):
     send_message(sock, 'copy_to_sync_dir', message)
     sock.close()
 
+
 def send_wipe_internal():
     try:
         message = json.dumps(dict(cmd='wipe_internal'))
@@ -105,6 +106,19 @@ def send_wipe_internal():
     sock = connect()
     send_message(sock, 'wipe_internal', message)
     sock.close()
+
+
+def send_offline_on(path):
+    try:
+        message = json.dumps(dict(cmd='offline_on', paths=[path]))
+    except Exception as e:
+        logger.error(
+            "Failed to serialize message '%s' to JSON (%s)", message, e)
+        return
+    sock = connect()
+    send_message(sock, 'offline_on', message)
+    sock.close()
+
 
 def send_show_command():
     try:

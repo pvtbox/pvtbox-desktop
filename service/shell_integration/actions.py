@@ -29,6 +29,7 @@ from .share_path import share_paths, cancel_sharing,  get_relpath, is_folder, \
 from .copy_path import queue_copying
 from .collaboration_settings import collaboration_path_settings
 from .file_info import file_info
+from .offline_path import offline_paths
 from service.shell_integration import params
 from urllib.parse import quote
 from common.translator import tr
@@ -82,7 +83,7 @@ def _on_share_paths_cb(paths, share_links, error_info='', move=False,
                 paths, share_links, context, move)
     elif paths:
         try:
-            share_names = list(map(get_relpath, paths))
+            share_names = list(map(lambda p: get_relpath(p)[1], paths))
             signals.share_path_failed.emit(share_names)
         except Exception as e:
             logger.warning(
@@ -167,7 +168,7 @@ def _on_email_link_cb(paths, share_links, error_info=''):
                     quote(body.encode("utf-8")))
         webbrowser.open_new(mailto_url)
     else:
-        share_names = list(map(get_relpath, paths))
+        share_names = list(map(lambda p: get_relpath(p)[1], paths))
         signals.share_path_failed.emit(share_names)
         Application.show_tray_notification(
             tr("Failed to share {} file(s)").format(len(paths)),
@@ -214,6 +215,17 @@ def file_info_slot(uuids, context):
     file_info(uuids, context)
 
 
+def offline_paths_slot(paths, is_offline=True):
+    '''
+    Processes 'offline_on', 'offline_off' shell commands
+
+    @param paths Filesystem paths [list]
+    @param is_offline flag [bool]
+    '''
+
+    offline_paths(paths, is_offline)
+
+
 def connect_slots():
     '''
     Connectes slots to shell commands signals
@@ -228,6 +240,7 @@ def connect_slots():
     signals.block_path.connect(block_path_slot)
     signals.collaboration_settings.connect(collaboration_settings_slot)
     signals.file_info.connect(file_info_slot)
+    signals.offline_paths.connect(offline_paths)
 
     # User messages
     signals.copying_failed.connect(show_copying_failed)
@@ -238,6 +251,8 @@ def connect_slots():
 
     signals.file_info_reply.connect(params.ipc_ws_server.on_file_info)
 
+    signals.smart_sync_changed.connect(
+        params.ipc_ws_server.on_smart_sync_changed)
 
 def disconnect_slots():
     '''
@@ -253,6 +268,7 @@ def disconnect_slots():
     signals.block_path.disconnect(block_path_slot)
     signals.collaboration_settings.disconnect(collaboration_settings_slot)
     signals.file_info.disconnect(file_info_slot)
+    signals.offline_paths.disconnect(offline_paths)
 
     # User messages
     signals.copying_failed.disconnect(show_copying_failed)
@@ -262,3 +278,6 @@ def disconnect_slots():
     signals.is_saved_to_clipboard.disconnect(link_copy_success)
 
     signals.file_info_reply.disconnect(params.ipc_ws_server.on_file_info)
+
+    signals.smart_sync_changed.disconnect(
+        params.ipc_ws_server.on_smart_sync_changed)

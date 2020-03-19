@@ -45,9 +45,10 @@ class RemoteEventStrategy(EventStrategy):
     """docstring for RemoteEventStrategy"""
 
     def __init__(self, db, event, last_server_event_id,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         super(RemoteEventStrategy, self).__init__(db, event,
-                                                  get_download_backups_mode)
+                                                  get_download_backups_mode,
+                                                  is_smart_sync)
         self._last_server_event_id = last_server_event_id
         if not hasattr(self, '_must_download_copy'):
             self._must_download_copy = False
@@ -143,6 +144,8 @@ class RemoteEventStrategy(EventStrategy):
             file.folder_id = folder.id
         file.excluded = (folder and folder.excluded or
                 is_contained_in_dirs(file.path, excluded_dirs))
+        if self._is_smart_sync:
+            file.is_offline = folder is not None and folder.is_offline
         return file
 
     def _get_last_event_id(self, session):
@@ -239,7 +242,8 @@ class RemoteEventStrategy(EventStrategy):
             already_deleted = add_dummy = False
             new_delete_event = None
 
-        if event.type == 'update' and self._download_backups:
+        if event.type == 'update' and self._download_backups and \
+                event.file.is_offline:
             self._process_update_adding(event, patches_storage)
         elif event.type in ('delete', 'move') and event.is_folder and \
                 not event.erase_nested:
@@ -256,7 +260,8 @@ class RemoteEventStrategy(EventStrategy):
         event.file_id = event.file.id
         if event.is_folder and event.type != 'delete':
             self._set_parents(
-                event.file_id, event.file_uuid, session, event.file.excluded)
+                event.file_id, event.file_uuid, session,
+                event.file.excluded, event.file.is_offline)
 
         session.add(event)
         if new_delete_event:
@@ -271,6 +276,11 @@ class RemoteEventStrategy(EventStrategy):
                                               previous_only=True,
                                               server_event_id=
                                               event.server_event_id)
+
+        if event.type == 'move':
+            remote_inc = self._check_offline(session)
+            events_queue.change_processing_events_counts(
+                remote_inc=remote_inc)
 
         if add_dummy:
             min_server_event_id = events_queue.get_min_server_event_id()
@@ -377,7 +387,8 @@ class RemoteEventStrategy(EventStrategy):
         event.file.event = None
         event.file.event_id = None
 
-    def _set_parents(self, folder_id, folder_uuid, session, is_excluded):
+    def _set_parents(self, folder_id, folder_uuid, session,
+                     is_excluded, is_offline):
         files = session.query(File) \
             .filter(File.event_id.is_(None)) \
             .filter(File.folder_id.is_(None)) \
@@ -394,6 +405,8 @@ class RemoteEventStrategy(EventStrategy):
                 for f in files])
         if is_excluded:
             self.db.mark_child_excluded(folder_id, session)
+        if is_offline:
+            self.db.mark_child_offline(folder_id, session)
 
     @atomic
     def download(self,
@@ -403,7 +416,8 @@ class RemoteEventStrategy(EventStrategy):
                  patches_storage,
                  signals,
                  reenter_event):
-        if self.event.diff_file_size == 0 and self.event.file_size == 0:
+        if self.event.diff_file_size == 0 and self.event.file_size == 0 or \
+                not self.event.file.is_offline:
             self.event.state = 'downloaded'
             return True
 
@@ -541,7 +555,8 @@ class RemoteEventStrategy(EventStrategy):
                 break
             time.sleep(0.5)
         logger.debug("_accept_delete_on_restore file %s", file.path)
-        fs.accept_delete(file.path, file.is_folder, file.id)
+        fs.accept_delete(file.path, file.is_folder, file.id,
+                         is_offline=file.is_offline)
 
     def _check_previous_delete(self, event, file_events, session,
                                events_queue, fs):
@@ -703,7 +718,7 @@ class RemoteEventStrategy(EventStrategy):
             path = self.event.file.path
             if (not self.event.file.id or
                 not fs.is_file_in_storage(self.event.file.id)) and \
-                    fs.path_exists(path):
+                    fs.path_exists(path, self.event.file.is_offline):
                 logger.debug("Moving folder to create collaboration %s", path)
                 conflicted_name = fs.generate_conflict_file_name(
                     path, is_folder=True)

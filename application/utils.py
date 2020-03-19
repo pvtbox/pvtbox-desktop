@@ -29,6 +29,7 @@ from PySide2.QtWidgets import QMessageBox
 
 from common.translator import tr
 from common.utils import get_platform, remove_socket_file
+from common.constants import FILE_LINK_SUFFIX
 
 translate = QCoreApplication.translate
 
@@ -109,6 +110,8 @@ def qt_open_path(path):
 
 
 def qt_reveal_file_in_file_manager(path):
+    if not exists(path) and exists(path + FILE_LINK_SUFFIX):
+        path += FILE_LINK_SUFFIX
     try:
         while not exists(path):
             path = dirname(path)
@@ -162,7 +165,7 @@ def check_sync_folder_removed():
     from common.file_path import FilePath
     from common.utils import get_bases_dir
 
-    main_cfg = load_main_config()
+    main_cfg = load_main_config(check=False)
     if not main_cfg.get_setting('user_email'):
         return False
 
@@ -174,7 +177,7 @@ def check_sync_folder_removed():
 def logging_enabled():
     from application.app_config import load_config as load_main_config
 
-    main_cfg = load_main_config()
+    main_cfg = load_main_config(check=False)
     return not main_cfg.get_setting('logging_disabled')
 
 

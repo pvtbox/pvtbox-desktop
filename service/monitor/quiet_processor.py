@@ -22,6 +22,7 @@ import os
 import shutil
 import logging
 import errno
+import pickle
 from threading import RLock
 
 import unicodedata
@@ -32,7 +33,9 @@ from service.monitor.rsync import Rsync
 from common.path_utils import get_signature_path
 from common.signal import Signal
 from common.utils import remove_dir, mkdir, \
-    get_copies_dir, create_empty_file, copy_file, remove_file, get_temp_dir
+    get_copies_dir, create_empty_file, copy_file, remove_file, get_temp_dir, \
+    set_ext_invisible, copy_time
+from common.constants import FILE_LINK_SUFFIX
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -61,7 +64,7 @@ class QuietProcessor(object):
         self.file_modified = Signal(str, float)
         self.access_denied = Signal(str)
 
-    def delete_file(self, full_path, events_file_id=None):
+    def delete_file(self, full_path, events_file_id=None, is_offline=True):
         full_path = unicodedata.normalize('NFC', full_path)
         with self._storage.create_session(read_only=False,
                                           locked=True) as session:
@@ -80,7 +83,7 @@ class QuietProcessor(object):
 
             if file:
                 try:
-                    remove_file(full_path)
+                    remove_file(self.get_hard_path(full_path, is_offline))
                 except OSError as e:
                     logger.warning("Can't remove file. Reason: %s", e)
                     if e.errno == errno.EACCES:
@@ -208,7 +211,7 @@ class QuietProcessor(object):
 
     def move_file(self, src_full_path, dst_full_path, events_file_id=None,
                   already_exists=None, file_not_found=None,
-                  wrong_file_id=None):
+                  wrong_file_id=None, is_offline=True):
         dst_full_path = unicodedata.normalize('NFC', dst_full_path)
         dst_rel_path = self._path_converter.create_relpath(dst_full_path)
         src_full_path = unicodedata.normalize('NFC', src_full_path)
@@ -242,7 +245,9 @@ class QuietProcessor(object):
                 file.relative_path = self._path_converter.create_relpath(
                     dst_full_path)
                 try:
-                    shutil.move(src=src_full_path, dst=dst_full_path)
+                    shutil.move(
+                        src=self.get_hard_path(src_full_path, is_offline),
+                        dst=self.get_hard_path(dst_full_path, is_offline))
                 except OSError as e:
                     logger.warning("Can't move file. Reason: %s", e)
                     if e.errno == errno.EACCES:
@@ -329,8 +334,13 @@ class QuietProcessor(object):
                     copy_hash, exclude=excludes, session=session)
                 if not file:
                     return False
+
                 file_path = self._path_converter.create_abspath(
                     file.relative_path)
+                if not exists(file_path):
+                    excludes.append(file.id)
+                    continue
+
                 try:
                     copy_file(file_path, tmp_full_path)
                     hash = Rsync.hash_from_block_checksum(
@@ -361,14 +371,15 @@ class QuietProcessor(object):
 
     def create_empty_file(self, file_rel_path, file_hash, silent,
                           events_file_id, search_by_id=False,
-                          wrong_file_id=None):
+                          wrong_file_id=None, is_offline=True):
         dst_full_path = self._path_converter.create_abspath(file_rel_path)
         self._create_file(None, dst_full_path, silent, file_hash,
-                          events_file_id, search_by_id, wrong_file_id)
+                          events_file_id, search_by_id, wrong_file_id,
+                          is_offline)
 
     def _create_file(self, src_full_path, dst_full_path, silent,
                      file_hash, events_file_id, search_by_id,
-                     wrong_file_id):
+                     wrong_file_id, is_offline=True):
 
         with self._storage.create_session(read_only=False,
                                           locked=True) as session:
@@ -382,6 +393,7 @@ class QuietProcessor(object):
                     dst_full_path = _full_path
 
             assert exists(dirname(dst_full_path))
+            hard_path = self.get_hard_path(dst_full_path, is_offline)
             if not file:
                 file = self._storage.get_known_file(
                     dst_full_path, is_folder=False, session=session)
@@ -395,9 +407,11 @@ class QuietProcessor(object):
                                         events_file_id,
                                         file.events_file_id)
             if file:
-                file_exists = file.file_hash == file_hash
+                file_exists = file.file_hash == file_hash and \
+                              (exists(dst_full_path) and is_offline or
+                               exists(hard_path) and not is_offline)
                 logger.debug("The fact that file %s with same hash "
-                             "already exists in storage is %s",
+                             "already exists in storage and filesystem is %s",
                              dst_full_path, file_exists)
 
             if file is None:
@@ -424,6 +438,8 @@ class QuietProcessor(object):
                     try:
                         remove_file(dst_full_path)
                         os.rename(tmp_full_path, dst_full_path)
+                        copy_time(dst_full_path + FILE_LINK_SUFFIX, dst_full_path)
+                        remove_file(dst_full_path + FILE_LINK_SUFFIX)
                     except Exception as e:
                         logger.warning("Can't rename to dst file %s. "
                                        "Reason: %s", dst_full_path, e)
@@ -433,11 +449,20 @@ class QuietProcessor(object):
                             pass
                         raise e
                 else:
-                    create_empty_file(dst_full_path)
+                    create_empty_file(hard_path)
+                    if not is_offline:
+                        self.write_events_file_id(hard_path, events_file_id)
+                        set_ext_invisible(hard_path)
+                    if hard_path.endswith(FILE_LINK_SUFFIX):
+                        copy_time(dst_full_path, hard_path)
+                        remove_file(dst_full_path)
+                    else:
+                        copy_time(hard_path, dst_full_path)
+                        remove_file(dst_full_path + FILE_LINK_SUFFIX)
 
             if silent:
-                file.mtime = os.stat(dst_full_path).st_mtime
-                file.size = os.stat(dst_full_path).st_size
+                file.mtime = os.stat(hard_path).st_mtime
+                file.size = os.stat(hard_path).st_size
                 file.file_hash = file_hash
                 file.events_file_id = events_file_id
                 file.was_updated = was_updated
@@ -547,3 +572,11 @@ class QuietProcessor(object):
     def _raise_access_denied(self, full_path):
         self.access_denied(full_path)
         raise self._exceptions.AccessDenied(full_path)
+
+    def get_hard_path(self, full_path, is_offline=True):
+        suffix = "" if is_offline else FILE_LINK_SUFFIX
+        return full_path + suffix
+
+    def write_events_file_id(self, hard_path, events_file_id):
+        with open(hard_path, 'wb') as f:
+            pickle.dump(events_file_id, f)

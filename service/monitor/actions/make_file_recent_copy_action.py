@@ -73,4 +73,5 @@ class MakeFileRecentCopyAction(ActionBase):
             not fs_event.is_dir
             and fs_event.event_type in (CREATE, MODIFY)
             and fs_event.file_size
+            and not fs_event.is_link
         )

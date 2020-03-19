@@ -112,20 +112,22 @@ class EventStrategy(object):
     """
     DUMMY_PAGE_SIZE = 500
 
-    def __init__(self, db, event, get_download_backups_mode):
+    def __init__(self, db, event, get_download_backups_mode,
+                 is_smart_sync=False):
         super(EventStrategy, self).__init__()
         self.event = event
         self.event_id = event.id if event else 0
         self.file_id = event.file.id if event and event.file else 0
         self.db = db
+        self._is_smart_sync = is_smart_sync
         self._cached_file_path = None
         self._events_queue = None
         self._download_backups = get_download_backups_mode()
         self._force_move = False
 
         self.change_processing_events_counts = Signal(int, int)  # (local, remote)
-        self.append_local_event = Signal(Event, str, str, int)
-        self.rename_or_delete_dst_path = Signal(str, int, Session)
+        self.append_local_event = Signal(Event, str, str, int, bool)
+        self.rename_or_delete_dst_path = Signal(str, int, Session, bool)
 
     ''' Public methods templates ==============================================
     '''
@@ -196,7 +198,8 @@ class EventStrategy(object):
             if self._process_parent_not_found(session):
                 fs.accept_delete(event_path,
                                  is_directory=event.is_folder,
-                                 events_file_id=event.file_id)
+                                 events_file_id=event.file_id,
+                                 is_offline=event.file.is_offline)
             return True, parent_found
 
         logger.debug('moving %s', event.file)
@@ -217,11 +220,12 @@ class EventStrategy(object):
             try:
                 fs.accept_move(
                     event_path, new_path, is_directory=event.is_folder,
-                    events_file_id=event.file_id)
+                    events_file_id=event.file_id,
+                    is_offline=event.file.is_offline)
             except fs.Exceptions.FileAlreadyExists:
                 if event.file.event_id and not event.file.is_deleted:
                     if not self._rename_or_delete_dst_path(
-                            new_path, session):
+                            new_path, session, event.file.is_offline):
                         raise SkipEventForNow()
                     else:
                         # retry move after renaming new path
@@ -274,7 +278,9 @@ class EventStrategy(object):
                     self._create_file_from_copy(new_path, fs)
                 else:
                     fs.create_empty_file(
-                        new_path, self.event.file_hash, self.event.file_id)
+                        new_path, self.event.file_hash,
+                        self.event.file_id,
+                        is_offline=self.event.file.is_offline)
         # Destination path is excluded
         elif not is_path_excluded and is_new_path_excluded:
             if not hasattr(self, '_excluded_ready') or \
@@ -290,13 +296,14 @@ class EventStrategy(object):
                 self.db.mark_child_excluded(self.event.file_id, session)
 
             # Delete object at source path
-            fs.accept_delete(event_path, is_directory=event.is_folder)
+            fs.accept_delete(event_path, is_directory=event.is_folder,
+                             is_offline=event.file.is_offline)
         return True, parent_found
 
-    def _rename_or_delete_dst_path(self, path, session):
+    def _rename_or_delete_dst_path(self, path, session, is_offline=True):
         try:
             self.rename_or_delete_dst_path.emit(
-                path, self.event.file_id, session)
+                path, self.event.file_id, session, is_offline)
         except RenameDstPathFailed:
             return False
 
@@ -753,3 +760,12 @@ class EventStrategy(object):
         events_queue.change_processing_events_counts(
             remote_inc=1)
         return True
+
+    def _check_offline(self, session):
+        not_applied = 0
+        event = self.event
+        folder = self.find_folder_by_uuid(session, event.folder_uuid)
+        if folder and folder.is_offline and not event.file.is_offline:
+            not_applied = self.db.make_offline(
+                event.file_uuid, session=session, is_offline=True)
+        return not_applied

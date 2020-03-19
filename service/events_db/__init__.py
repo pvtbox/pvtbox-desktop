@@ -22,7 +22,8 @@ from sqlalchemy.exc import IntegrityError
 from service.events_db.file import File
 from service.events_db.event import Event
 from service.events_db.file_events_db import FileEventsDB, FileEventsDBError, \
-    FolderNotFound, FileNotFound, EventsDbBusy, FileInProcessing
+    FolderNotFound, FileNotFound, EventsDbBusy, FileInProcessing, \
+    FileUUIDNotFound
 
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     IntegrityError,
     EventsDbBusy,
     FileInProcessing,
+    FileUUIDNotFound,
 ]

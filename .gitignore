@@ -46,7 +46,7 @@ so
 /lost_folder_dialog.py
 /pvtbox_main.py
 /pvtbox_main_rc.py
-/selective_sync.py
+/smart_sync.py
 /settings.py
 /share_files.py
 /tutorial.py

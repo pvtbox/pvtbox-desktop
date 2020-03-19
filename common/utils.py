@@ -47,7 +47,7 @@ import pickle
 import sqlalchemy
 
 from common.constants import SIGNATURE_BLOCK_SIZE, MAX_PATH_LEN, \
-    WIN10_NAV_PANE_CLSID
+    WIN10_NAV_PANE_CLSID, FILE_LINK_SUFFIX
 
 # Setup logging
 
@@ -309,6 +309,9 @@ def get_device_name():
     #device_name = str(socket.gethostname(),
     #                      errors='ignore',
     #                      encoding=LOCALE_ENC)
+    global is_daemon
+    if is_daemon:
+        return "Self-Hosted server node"
     device_name = str(socket.gethostname())
     device_name = device_name.replace('?', '')[:30]
     if not device_name:
@@ -874,7 +877,7 @@ def get_file_size(filename):
 
 
 @benchmark
-def get_filelist(root_dir, exclude_dirs=list(), exclude_files=list()):
+def get_filelist(root_dir, exclude_dirs=(), exclude_files=()):
     '''
     Returns list of files containing in the directory
 
@@ -914,7 +917,7 @@ def get_filelist(root_dir, exclude_dirs=list(), exclude_files=list()):
 
 
 @benchmark
-def get_dir_list(root_dir, exclude_dirs=list()):
+def get_dir_list(root_dir, exclude_dirs=()):
     from common.file_path import FilePath
 
     logger.debug("exclude_dirs %s", exclude_dirs)
@@ -936,7 +939,7 @@ def get_dir_list(root_dir, exclude_dirs=list()):
 
 
 @benchmark
-def get_files_dir_list(root_dir, exclude_dirs=list(), exclude_files=list()):
+def get_files_dir_list(root_dir, exclude_dirs=(), exclude_files=()):
     from common.file_path import FilePath
 
     exclude_dirs = map(ensure_unicode, exclude_dirs)
@@ -1357,7 +1360,7 @@ def get_icons_path():
     if getattr(sys, 'frozen', False):
         system = get_platform()
         if system == 'Darwin':
-            icons_dir = '../Resources'
+            icons_dir = '../../../Resources'
         elif system == 'Windows':
             icons_dir = 'Icons'
         else:
@@ -1980,6 +1983,119 @@ def cwd(path):
     finally:
         os.chdir(oldpwd)
 
+
+def set_ext_invisible(path):
+    if get_platform() != 'Darwin':
+        return
+
+    from Cocoa import NSFileManager
+
+    NSFileManager.defaultManager().setAttributes_ofItemAtPath_error_(
+        dict(NSFileExtensionHidden=True), path, None)
+
+
+def delete_file_links(data_dir):
+    file_paths = (p for p in get_filelist(data_dir, exclude_dirs=['.pvtbox'])
+                  if p.endswith(FILE_LINK_SUFFIX))
+    list(map(remove_file, file_paths))
+
+
+def copy_time(src_path, dst_path):
+    if not op.exists(src_path):
+        return
+
+    platform = get_platform()
+    try:
+        if platform == 'Darwin':
+            from Cocoa import NSFileManager
+            creation_date = NSFileManager.defaultManager().attributesOfItemAtPath_error_(
+                src_path, None)[0]['NSFileCreationDate']
+            NSFileManager.defaultManager().setAttributes_ofItemAtPath_error_(
+                dict(NSFileCreationDate=creation_date), dst_path, None)
+        elif platform == "Windows":
+            # https://stackoverflow.com/questions/4996405/
+            # how-do-i-change-the-file-creation-date-of-a-windows-file
+            from ctypes import windll, wintypes, byref
+
+            source_time = op.getctime(src_path)
+
+            # Convert Unix timestamp to Windows FileTime using some magic numbers
+            # See documentation: https://support.microsoft.com/en-us/help/167296
+            timestamp = int((source_time * 10000000) + 116444736000000000)
+            ctime = wintypes.FILETIME(timestamp & 0xFFFFFFFF, timestamp >> 32)
+
+            # Call Win32 API to modify the file creation date
+            wpath = ctypes.c_wchar_p(dst_path)
+            handle = windll.kernel32.CreateFileW(wpath, 256, 0, None, 3, 128, None)
+            windll.kernel32.SetFileTime(handle, byref(ctime), None, None)
+            windll.kernel32.CloseHandle(handle)
+    except Exception as e:
+        logger.warning("Can't copy creation date from %s to %s. reason: %s",
+                       src_path, dst_path, e)
+
+    try:
+        shutil.copystat(src_path, dst_path)
+    except Exception as e:
+        logger.warning("Can't copy time from %s to %s. reason: %s",
+                       src_path, dst_path, e)
+
+
+def add_unreg_key(key, title):
+    if get_platform() != 'Windows':
+        return
+
+    import winreg
+    with winreg.OpenKeyEx(
+            winreg.HKEY_CURRENT_USER,
+            'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce',
+            access=winreg.KEY_ALL_ACCESS) \
+            as run_once_key:
+        command = "reg delete {} /f".format(key)
+        winreg.SetValueEx(
+            run_once_key, title, 0, winreg.REG_SZ, command)
+
+
+def register_smart():
+    if get_platform() != 'Windows' or is_launched_from_code():
+        return
+
+    import winreg
+    app_path = get_application_path() + '\\'
+    pvtbox_exe = app_path + 'pvtbox.exe'
+    software_classes = 'Software\\Classes\\'
+    dot_pvtbox = software_classes + '.pvtbox'
+    smartfile = 'net.pvtbox.SMARTFILE'
+    net_pvtbox_smartfile = software_classes + smartfile
+    try:
+        # register smart sync entries
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, dot_pvtbox) as key:
+            winreg.SetValueEx(
+                key, None, 0,  winreg.REG_SZ, smartfile)
+        if is_portable():
+            add_unreg_key("HKCU\\" + dot_pvtbox, "Unreg .pvtbox")
+
+        with winreg.CreateKeyEx(
+                winreg.HKEY_CURRENT_USER, net_pvtbox_smartfile) as key:
+            winreg.SetValueEx(
+                key, None, 0,  winreg.REG_SZ, "Pvtbox SmartSync+ file")
+            winreg.SetValueEx(
+                key, "NeverShowExt", 0, winreg.REG_SZ, "")
+            with winreg.CreateKeyEx(key, 'DefaultIcon') as subkey:
+                winreg.SetValueEx(
+                    subkey, None, 0, winreg.REG_SZ,
+                    app_path + "icons\\file_online.ico")
+            with winreg.CreateKeyEx(key, 'shell\\open\\command') as subkey:
+                winreg.SetValueEx(
+                    subkey, None, 0, winreg.REG_SZ,
+                    '"{}" "--offline-on" "%1"'.format(pvtbox_exe))
+        if is_portable():
+            add_unreg_key(
+                "HKCU\\" + net_pvtbox_smartfile, "Unreg net.pvtbox.SMARTFILE")
+
+    except Exception as e:
+        logger.warning("Can't register for portable. Reason: (%s)", e)
+
+
 # System locale encoding name
 LOCALE_NAME, LOCALE_ENC = get_locale()
 
@@ -1992,3 +2108,4 @@ get_bases_dir = get_patches_dir
 
 os_name_value = None
 is_server_value = None
+is_daemon = False

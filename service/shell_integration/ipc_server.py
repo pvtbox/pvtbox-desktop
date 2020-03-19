@@ -25,7 +25,8 @@ from common.async_utils import run_daemon
 from common.utils import remove_socket_file
 from service.shell_integration import params as params
 from service.shell_integration.protocol import parse_message, emit_signal, \
-    get_sync_dir_reply, create_command, get_is_sharing_reply
+    get_sync_dir_reply, create_command, get_is_sharing_reply, \
+    get_offline_status_reply
 
 
 # Setup logging
@@ -135,6 +136,14 @@ def rx_thread_worker():
         # Is path shared requested
         elif cmd == 'is_shared':
             send_msg(get_is_sharing_reply(paths if paths else [path]))
+            continue
+        elif cmd in ('offline_off', 'offline_on'):
+            is_offline = cmd == 'offline_on'
+            emit_signal('offline_paths', paths, is_offline)
+            send_msg(create_command(cmd))
+            continue
+        elif cmd == 'offline_status':
+            send_msg(get_offline_status_reply(paths if paths else [path]))
             continue
 
         # Process other commands

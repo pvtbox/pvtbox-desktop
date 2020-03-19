@@ -172,5 +172,7 @@ inst.WIN10_NAV_PANE_CLSID = '{07fa4a2b-c86d-4b31-925a-3d15d941f98e}'
 
 inst.FILE_LIST_COUNT_LIMIT = 7
 
+inst.FILE_LINK_SUFFIX = '.pvtbox'
+
 inst._finalize()
 sys.modules[__name__] = inst

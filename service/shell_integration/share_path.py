@@ -25,7 +25,7 @@ from threading import RLock
 
 from service.events_db import FileNotFound, FileInProcessing
 from common.utils import ensure_unicode
-from common.constants import STATUS_WAIT
+from common.constants import STATUS_WAIT, FILE_LINK_SUFFIX
 from common.webserver_client import Client_APIError
 from service.shell_integration import params
 from common.file_path import FilePath
@@ -73,13 +73,16 @@ def get_relpath(path):
         logger.error("Sync directory is not set")
         raise SharePathException()
 
+    if path.endswith(FILE_LINK_SUFFIX) and not op.isdir(path):
+        path = path[: -len(FILE_LINK_SUFFIX)]
+
     # Path is not in sync directory
     if not (FilePath(path) in FilePath(root)):
         logger.debug("Path '%s' is not in sync directory '%s'", path, root)
         raise SharePathException()
 
     # Path is not exist
-    if not op.exists(path):
+    if not op.exists(path) and not op.exists(path + FILE_LINK_SUFFIX):
         logger.warning("Path '%s' is not exist", path)
         raise SharePathException()
 
@@ -164,7 +167,7 @@ def share_paths(paths, link_ready_cb, save_to_clipboard=False,
         while True:
             # Wait if file not in db yet
             try:
-                if op.isfile(path):
+                if op.isfile(path) or op.isfile(path + FILE_LINK_SUFFIX):
                     is_file = True
                     uuid = params.sync.get_file_uuid(rel_path)
                 elif op.isdir(path):
@@ -180,7 +183,7 @@ def share_paths(paths, link_ready_cb, save_to_clipboard=False,
                 break
 
             if step == message_timeout:
-                filename = op.basename(path)
+                filename = op.basename(rel_path)
                 Application.show_tray_notification(
                     tr("Prepare to copy URL(s) for downloading to clipboard.\n"
                        "URL(s) will be copied after {} synced").format(
@@ -280,7 +283,7 @@ def cancel_sharing(paths):
         sharing_info = params.ss_client.get_sharing_info()
 
         # Given path is a file inside sync directory
-        if op.isfile(path):
+        if op.isfile(path) or op.isfile(path + FILE_LINK_SUFFIX):
             uuid = params.sync.get_file_uuid(rel_path)
         elif op.isdir(path):
             uuid = params.sync.get_folder_uuid(rel_path)
@@ -315,12 +318,13 @@ def cancel_sharing(paths):
 
 def is_paths_shared(paths):
     for path in paths:
+        is_file = op.isfile(path)
         try:
             _, rel_path = get_relpath(path)
         except SharePathException:
             continue
         logger.debug("Checking sharing path '%s'...", rel_path)
-        if params.sync.is_path_shared(rel_path):
+        if params.sync.is_path_shared(rel_path, is_file):
             return True
 
     return False

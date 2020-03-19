@@ -48,13 +48,14 @@ class CreateFileStrategy(object):
         assert self.event.file_hash
         assert self.file_download
 
-        if self.event.file_size:
+        if self.event.file_size and self.event.file.is_offline:
             self._create_file_from_copy(path, fs)
         else:
             fs.create_empty_file(
                 path,
                 self.event.file_hash,
-                self.event.file_id)
+                self.event.file_id,
+                is_offline=self.event.file.is_offline)
 
         fs.file_added.emit(path, False, time())
         # file can't be excluded if we are here
@@ -69,12 +70,13 @@ class CreateFileStrategy(object):
 class LocalCreateFileStrategy(CreateFileStrategy, LocalEventStrategy):
     """docstring for LocalCreateFileStrategy"""
     def __init__(self, db, event, file_path, license_type,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         super(LocalCreateFileStrategy, self).__init__(
             db=db,
             event=event,
             file_path=file_path,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
         self._license_type = license_type
 
     ''' Overloaded methods ====================================================
@@ -164,7 +166,8 @@ class LocalCreateFileStrategy(CreateFileStrategy, LocalEventStrategy):
                     src=self.event.file.path,
                     dst=conflict_name,
                     is_directory=self.event.is_folder,
-                    events_file_id=self.event.file.id)
+                    events_file_id=self.event.file.id,
+                    is_offline=self.event.file.is_offline)
             except fs.Exceptions.FileNotFound as e:
                 logger.warning("Original file missing %s", e)
             self.event.file.name = self.event.file_name
@@ -193,7 +196,9 @@ class LocalCreateFileStrategy(CreateFileStrategy, LocalEventStrategy):
         conflicted_name = self._get_free_file_name(
             self.event.file.name, fs)
         try:
-            fs.copy_file(self.event.file.path, conflicted_name)
+            fs.copy_file(
+                self.event.file.path, conflicted_name,
+                self.event.file.is_offline)
         except fs.Exceptions.FileNotFound:
             logger.warning("Can't copy file. File does not exist %s",
                            self.event.file.path)
@@ -205,12 +210,13 @@ class LocalCreateFileStrategy(CreateFileStrategy, LocalEventStrategy):
 
 class RemoteCreateFileStrategy(CreateFileStrategy, RemoteEventStrategy):
     def __init__(self, db, event, copies_storage=None,
-                 get_download_backups_mode=lambda: None):
+                 get_download_backups_mode=lambda: None, is_smart_sync=False):
         super(RemoteCreateFileStrategy, self).__init__(
             db=db,
             event=event,
             last_server_event_id=None,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
         self._copies_storage = copies_storage
 
     ''' Overloaded methods ====================================================

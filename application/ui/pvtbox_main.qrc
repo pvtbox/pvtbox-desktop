@@ -103,5 +103,8 @@
     <file>images/settings/logout_hovered.svg</file>
     <file>images/settings/pencil.svg</file>
     <file>images/settings/pencil_hovered.svg</file>
+    <file>images/status_synced.svg</file>
+    <file>images/status_online.svg</file>
+    <file>images/status_syncing.svg</file>
   </qresource>
 </RCC>

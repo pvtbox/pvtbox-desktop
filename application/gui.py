@@ -39,6 +39,7 @@ from common.application import Application
 from .lost_folder_dialog import LostFolderDialog
 from common.async_qt import wait_signal, qt_run
 
+from common.constants import FREE_LICENSE
 from common.constants import PASSWORD_REMINDER_URI, HELP_URI, REGULAR_URI
 from common.constants import WEB_FM_URI, PRIVACY_URI, TERMS_URI
 from common.constants import STATUS_WAIT, STATUS_PAUSE, STATUS_IN_WORK, \
@@ -64,8 +65,8 @@ from .settings import Settings
 from .utils import elided, qt_open_path, open_link, service_cleanup
 from common.translator import tr
 from .device_list_dialog import DeviceListDialog
-from .service_proxy import ServiceProxy
-from .service_client import ServiceClient
+from common.service_proxy import ServiceProxy
+from common.service_client import ServiceClient
 from .app_config import Config, load_config
 from .updater_worker import UpdaterWorker
 from .tutorial_dialog import TutorialDialog
@@ -141,6 +142,7 @@ class GUI(QObject):
     management_action_in_progress = pyqtSignal(str, str, str)
     final_exit = pyqtSignal()
     service_started = pyqtSignal()
+    offline_dirs = pyqtSignal(list)
 
     close_about_dialog = pyqtSignal()
     _show_auth_page_signal = pyqtSignal(bool, bool)
@@ -244,6 +246,7 @@ class GUI(QObject):
         self._init_dialogs_state()
 
         self._download_backups = self._main_cfg.download_backups
+        self._smart_sync = self._main_cfg.smart_sync
 
         self._arrange_window()
 
@@ -469,6 +472,7 @@ class GUI(QObject):
             self._is_gui_logging = True
             self.show_loading_screen()
             if not self._sync_folder_removed:
+                self._show_smart_sync_alert()
                 self.autologin()
         elif not self._main_cfg.user_email:
             self.show_auth_page(True)
@@ -974,6 +978,7 @@ class GUI(QObject):
             ui.auth_views.setCurrentWidget(ui.login_page)
         ui.auth_button.setAutoDefault(True)
         ui.download_backups_checkBox.setChecked(self._download_backups)
+        ui.smart_sync_checkBox.setChecked(self._smart_sync)
 
         self._clear_main_window()
 
@@ -1202,6 +1207,7 @@ class GUI(QObject):
     def on_auth_button_click(self):
         self.show_waiting_button()
         self._download_backups = self._ui.download_backups_checkBox.isChecked()
+        self._smart_sync = self._ui.smart_sync_checkBox.isChecked()
         if self._ui.register_radioButton.isChecked():
             self.on_register_click()
         else:
@@ -1302,7 +1308,7 @@ class GUI(QObject):
 
         self._save_login_settings(self._login_data)
         self._service.gui_logged_in(
-            self._login_data, new_user, self._download_backups)
+            self._login_data, new_user, self._download_backups, self._smart_sync)
         self._status = STATUS_DISCONNECTED
         self._update_status()
         self.show_main_page()
@@ -1318,6 +1324,10 @@ class GUI(QObject):
             changed_settings['download_backups'] = self._download_backups
             self._main_cfg.set_settings(
                 {'download_backups': self._download_backups})
+        if self._smart_sync is not None:
+            changed_settings['smart_sync'] = self._smart_sync
+            self._main_cfg.set_settings(
+                {'smart_sync': self._smart_sync})
 
         self._config.set_settings(changed_settings)
 
@@ -1536,6 +1546,8 @@ class GUI(QObject):
             self._update_status()
             self._download_backups = self._config.get_setting(
                 "download_backups", False)
+            self._smart_sync = self._config.get_setting(
+                "smart_sync", True)
             self.show_auth_page(False, True)
         self._close_opened_dialogs()
 
@@ -1556,10 +1568,15 @@ class GUI(QObject):
                                  parent=self._window,
                                  size=self._sync_dir_size,
                                  migrate=migrate,
-                                 dp=self._dp)
+                                 dp=self._dp,
+                                 get_offline_dirs=
+                                 self._service.get_offline_dirs,
+                                 set_offline_dirs=
+                                 self._service.set_offline_dirs)
         settings_form.logged_out.connect(on_logged_out)
         settings_form.logging_disabled_changed.connect(
             on_logging_disabled_changed)
+        self.offline_dirs.connect(settings_form.offline_dirs)
         self._settings_opened = True
 
         def on_finished():
@@ -1567,6 +1584,7 @@ class GUI(QObject):
             settings_form.logged_out.disconnect(on_logged_out)
             settings_form.logging_disabled_changed.disconnect(
                 on_logging_disabled_changed)
+            self.offline_dirs.disconnect(settings_form.offline_dirs)
 
         settings_form.show(on_finished)
 
@@ -2143,3 +2161,27 @@ class GUI(QObject):
     @property
     def web_api(self):
         return self._web_api
+
+    def _show_smart_sync_alert(self):
+        def on_click(_, button_index):
+            self._smart_sync = button_index == 0
+            settings = {'smart_sync': self._smart_sync}
+            self._config.set_settings(settings)
+            self._main_cfg.set_settings(settings)
+
+        if not 'smart_sync' in self._main_cfg.get_defaults_applied() or \
+                self._main_cfg.license_type == FREE_LICENSE:
+            return
+
+        msg = "<h3>" + tr(
+            "SmartSync+ was enabled on your device.") + "</h3><h4>" + tr(
+            "This will allow to see and access every file in your account"
+            " without taking up your hard disc space.") + "</h4><br><small>" + tr(
+            "If you want to access your files offline or store files "
+            "from other nodes, you can add these files and/or folders to offline "
+            "via your files manager context menu, account settings "
+            "or by disabling SmartSync+.") + "</small>"
+        title = tr("Pvtbox SmartSync+")
+        self.request_to_user(
+            0, msg, buttons=[tr("Ok"), tr("Disable SmartSync+")],
+            title=title, on_clicked_cb=on_click)

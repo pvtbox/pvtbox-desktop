@@ -40,9 +40,10 @@ logger.addHandler(logging.NullHandler())
 
 class LocalEventStrategy(EventStrategy):
     """docstring for LocalEventStrategy"""
-    def __init__(self, db, event, file_path, get_download_backups_mode):
-        super(LocalEventStrategy, self).__init__(db, event,
-                                                 get_download_backups_mode)
+    def __init__(self, db, event, file_path, get_download_backups_mode,
+                 is_smart_sync=False):
+        super(LocalEventStrategy, self).__init__(
+            db, event, get_download_backups_mode, is_smart_sync=is_smart_sync)
         self._file_path = file_path
         if file_path:
             event.file_name = basename(file_path)
@@ -109,7 +110,7 @@ class LocalEventStrategy(EventStrategy):
     @atomic
     def add_to_local_database(self, session, patches_storage=None,
                               copies_storage=None, events_queue=None,
-                              fs_event=None):
+                              fs_event=None, is_offline=True):
         event = self.event
         logger.debug("adding event to local database: %s", event)
         assert not event.id, "Event must not be already saved to db"
@@ -119,6 +120,10 @@ class LocalEventStrategy(EventStrategy):
             events_file_id = fs_event.file.events_file_id if fs_event \
                 else self.file_id
             file = self._get_file(session, events_file_id)
+            file.is_offline = not fs_event.is_link if fs_event else is_offline
+            if self._is_smart_sync and file.is_folder and (not file.folder or
+                    file.folder and not file.folder.is_offline):
+                file.is_offline = False
         except FileNotFound:
             if event.type == 'delete':
                 raise EventAlreadyAdded
@@ -127,6 +132,8 @@ class LocalEventStrategy(EventStrategy):
         except AssertionError:
             if event.type == 'create':
                 file = self._get_file_by_relative_path(session)
+                file.is_offline = not fs_event.is_link if fs_event \
+                    else is_offline
                 fs_event.file.events_file_id = file.id
                 raise EventAlreadyAdded
             else:
@@ -296,6 +303,18 @@ class LocalEventStrategy(EventStrategy):
         if event.type in ('move', 'delete') and event.is_folder:
             self._update_excluded_dirs(fs, excluded_dirs, session,
                                        signals=event_queue)
+
+        if event.type == 'move':
+            remote_inc = self._check_offline(session)
+            event_queue.change_processing_events_counts(
+                remote_inc=remote_inc)
+
+        if event.file.toggle_offline:
+            remote_inc = self.db.make_offline(
+                event.file_uuid, session=session,
+                is_offline=not event.file.is_offline)
+            event_queue.change_processing_events_counts(
+                remote_inc=remote_inc)
 
         self._update_db_file_on_register(event.file, session)
         logger.debug("registered local event %s", event)
@@ -502,7 +521,8 @@ class LocalEventStrategy(EventStrategy):
             try:
                 fs.accept_delete(self.event.file.path,
                                  is_directory=self.event.is_folder,
-                                 events_file_id=self.event.file_id)
+                                 events_file_id=self.event.file_id,
+                                 is_offline=self.event.file.is_offline)
             except Exception as e:
                 logger.warning("Can't delete %s. Reason: %s",
                                self.event.file.path, e)
@@ -746,8 +766,9 @@ class LocalEventStrategy(EventStrategy):
 
         file_path = file.path
         is_path_excluded = is_contained_in_dirs(file_path, excluded_dirs)
-        if fs.path_exists(file_path):
-            self._rename_or_delete_dst_path(file_path, session)
+        file.excluded = is_path_excluded
+        if fs.path_exists(file_path, file.is_offline):
+            self._rename_or_delete_dst_path(file_path, session, file.is_offline)
         if is_folder_move:
             if (not folder or not folder.is_deleted) and not is_path_excluded:
                 try:
@@ -769,7 +790,7 @@ class LocalEventStrategy(EventStrategy):
         elif ((not folder or not folder.is_deleted) and
               (conflict_event_type in ('update', 'move') and
                not delete_event_id and not is_path_excluded)):
-            if before_conflict_event.file_size:
+            if before_conflict_event.file_size and file.is_offline:
                 try:
                     fs.restore_file_from_copy(
                         file_name=file_path,
@@ -787,7 +808,8 @@ class LocalEventStrategy(EventStrategy):
                 fs.create_empty_file(
                     file_name=file_path,
                     file_hash=before_conflict_event.file_hash,
-                    events_file_id=file.id
+                    events_file_id=file.id,
+                    is_offline=file.is_offline
                 )
 
         logger.debug("_restore_last_nonconflicted_state event.file.event %s",
@@ -802,7 +824,9 @@ class LocalEventStrategy(EventStrategy):
             before_conflict_file_hash, create_strategy_from_event):
 
         new_file = File(
-            name=file.name, is_folder=self.event.is_folder)
+            name=file.name, is_folder=self.event.is_folder,
+            is_offline=file.is_offline or
+                       file.folder is not None and file.folder.is_offline)
         new_file.folder = file.folder
 
         for event in list(file.events):
@@ -856,12 +880,14 @@ class LocalEventStrategy(EventStrategy):
             try:
                 fs.accept_delete(self.event.file.path,
                                  self.event.is_folder,
-                                 events_file_id=self.file_id)
+                                 events_file_id=self.file_id,
+                                 is_offline=self.event.file.is_offline)
             except fs.Exceptions.WrongFileId:
                 logger.warning("Wrong file id while deleting %s",
                                self.event.file.path)
                 fs.accept_delete(self.event.file.path,
-                                 self.event.is_folder)
+                                 self.event.is_folder,
+                                 is_offline=self.event.file.is_offline)
 
         self.event = None
 
@@ -995,7 +1021,8 @@ class LocalEventStrategy(EventStrategy):
                 fs.accept_move(
                     src=conflicting_name,
                     dst=resolved_name,
-                    is_directory=self.event.is_folder)
+                    is_directory=self.event.is_folder,
+                    is_offline=self.event.file.is_offline)
                 break
             except fs.Exceptions.FileAlreadyExists:
                 logger.debug("Resolved name '%s' already exists.",

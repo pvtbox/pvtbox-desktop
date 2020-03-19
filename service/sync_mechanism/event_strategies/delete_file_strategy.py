@@ -39,12 +39,14 @@ class DeleteFileStrategy(object):
 
 
 class LocalDeleteFileStrategy(DeleteFileStrategy, LocalEventStrategy):
-    def __init__(self, db, event, file_path, get_download_backups_mode):
+    def __init__(self, db, event, file_path, get_download_backups_mode,
+                 is_smart_sync=False):
         super(LocalDeleteFileStrategy, self).__init__(
             db=db,
             event=event,
             file_path=file_path,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     ''' Overloaded methods ====================================================
     '''
@@ -96,7 +98,8 @@ class LocalDeleteFileStrategy(DeleteFileStrategy, LocalEventStrategy):
 
             self.append_local_event.emit(
                 new_delete_event, self.event.file.path,
-                None, self.event.file_id)
+                None, self.event.file_id,
+                self.event.file.is_offline)
             # do not remove from processing events
             # for not downloading event twice
             result = False
@@ -118,7 +121,7 @@ class LocalDeleteFileStrategy(DeleteFileStrategy, LocalEventStrategy):
 class RemoteDeleteFileStrategy(DeleteFileStrategy, RemoteEventStrategy):
     """Handle 'delete' file_event received from signal server"""
     def __init__(self, db, event, last_server_event_id, copies_storage,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         self._copies_storage = copies_storage
         self._must_download_copy = False
 
@@ -126,7 +129,8 @@ class RemoteDeleteFileStrategy(DeleteFileStrategy, RemoteEventStrategy):
             db=db,
             event=event,
             last_server_event_id=last_server_event_id,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
         self._download_priority = DOWNLOAD_PRIORITY_REVERSED_PATCH
 
@@ -142,7 +146,8 @@ class RemoteDeleteFileStrategy(DeleteFileStrategy, RemoteEventStrategy):
             # don't delete file if other file with same name exicts
             logger.debug("Deleting file (folder) '%s'...", file_path)
             fs.accept_delete(file_path, is_directory=self.event.is_folder,
-                             events_file_id=self.event.file_id)
+                             events_file_id=self.event.file_id,
+                             is_offline=self.event.file.is_offline)
             logger.info("File (folder) '%s' is deleted", file_path)
         else:
             fs.change_events_file_id(self.event.file_id, None)

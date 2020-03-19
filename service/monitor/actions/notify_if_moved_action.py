@@ -21,7 +21,7 @@
 ###############################################################################
 from service.monitor.actions.action_base import ActionBase
 from common.signal import Signal
-from common.constants import MOVE
+from common.constants import MOVE, FILE_LINK_SUFFIX
 
 
 class NotifyIfMovedAction(ActionBase):
@@ -33,7 +33,13 @@ class NotifyIfMovedAction(ActionBase):
 
     def add_new_event(self, fs_event):
         if fs_event.event_type == MOVE:
+            src_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] \
+                if fs_event.is_link \
+                else fs_event.src
+            dst_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] \
+                if fs_event.is_link \
+                else fs_event.dst
             self.file_moved.emit(
-                self._patch_converter.create_relpath(fs_event.src),
-                self._patch_converter.create_relpath(fs_event.dst)
+                self._patch_converter.create_relpath(src_path),
+                self._patch_converter.create_relpath(dst_path)
             )

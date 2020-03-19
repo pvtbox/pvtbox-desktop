@@ -22,7 +22,7 @@
 import logging
 
 from service.monitor.actions.action_base import ActionBase
-from common.constants import MODIFY
+from common.constants import MODIFY, FILE_LINK_SUFFIX
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -34,11 +34,13 @@ class SaveFileMtimeAndSizeAction(ActionBase):
         self._storage = storage
 
     def _on_new_event(self, fs_event):
+        src_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] if fs_event.is_link \
+            else fs_event.src
         try:
             with self._storage.create_session(read_only=False,
                                               locked=True) as session:
                 file = self._storage.get_known_file(
-                    fs_event.src, session=session)
+                    src_path, session=session)
                 if file != fs_event.file:
                     return self.event_returned(fs_event)
 

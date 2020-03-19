@@ -67,6 +67,7 @@ class FsEvent(object):
         self.old_mtime = 0
         self.old_size = 0
         self.in_storage = False
+        self.is_link = False
 
     @property
     def event_name(self):

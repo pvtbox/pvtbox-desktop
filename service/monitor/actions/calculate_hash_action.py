@@ -30,11 +30,15 @@ class CalculateHashAction(ActionBase):
         super(CalculateHashAction, self).__init__()
 
     def _on_new_event(self, fs_event):
-        try:
-            fs_event.new_hash = Rsync.hash_from_block_checksum(
-                fs_event.new_signature)
-        except (IOError, OSError):
-            return self.event_returned(fs_event)
+        if fs_event.is_link:
+            fs_event.new_hash = fs_event.old_hash
+        else:
+            try:
+                fs_event.new_hash = Rsync.hash_from_block_checksum(
+                    fs_event.new_signature)
+            except (IOError, OSError):
+                return self.event_returned(fs_event)
+
         self.event_passed(fs_event)
 
     def _is_sutable(self, fs_event):

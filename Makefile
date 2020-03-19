@@ -43,7 +43,7 @@ venv: $(VENV)/init_ts $(VENV)/deps_ts build_resources
 clean-venv:
 	rm -rf $(VENV)
 
-.PHONY: build clean-build
+.PHONY: build clean-build build-d
 build: venv
 	PYTHONPATH=$(PYTHONPATH) \
 	$(VENV)/bin/pyinstaller --clean --log-level WARN --noconfirm -F \
@@ -55,6 +55,13 @@ build: venv
 	--key=7h3SeCr37key --specpath=./pyinstaller/$(OS) \
 	--workpath=$(PWD)/build/$(OS)-$(ARCH) --distpath=$(PWD)/dist/$(OS)-$(ARCH) \
 	pyinstaller/$(OS)/app.spec
+
+build-d: venv
+	PYTHONPATH=$(PYTHONPATH) \
+	$(VENV)/bin/pyinstaller --clean --log-level WARN --noconfirm -F \
+	--key=7h3SeCr37key --specpath=./pyinstaller/$(OS) \
+	--workpath=$(PWD)/build/$(OS)-$(ARCH) --distpath=$(PWD)/dist/$(OS)-$(ARCH) \
+	pyinstaller/$(OS)/d.spec
 
 
 # Remove PyInstaller stuff
@@ -94,7 +101,7 @@ build_resources:
 	pyside2-uic -o pvtbox_main.py application/ui/pvtbox_main.ui
 	pyside2-uic -o settings.py application/ui/settings.ui
 	pyside2-uic -o share_files.py application/ui/share_files.ui
-	pyside2-uic -o selective_sync.py application/ui/selective_sync.ui
+	pyside2-uic -o smart_sync.py application/ui/smart_sync.ui
 	pyside2-uic -o device_list.py application/ui/device_list.ui
 	pyside2-uic -o lost_folder_dialog.py application/ui/lost_folder_dialog.ui
 	pyside2-uic -o tutorial.py application/ui/tutorial.ui

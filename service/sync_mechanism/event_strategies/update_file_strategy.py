@@ -39,13 +39,15 @@ class UpdateFileStrategy(object):
 
 
 class LocalUpdateFileStrategy(UpdateFileStrategy, LocalEventStrategy):
-    def __init__(self, db, event, file_path, get_download_backups_mode):
+    def __init__(self, db, event, file_path, get_download_backups_mode,
+                 is_smart_sync=False):
         assert event.file_hash
         super(LocalUpdateFileStrategy, self).__init__(
             db=db,
             event=event,
             file_path=file_path,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     ''' Overloaded methods ====================================================
     '''
@@ -69,7 +71,8 @@ class LocalUpdateFileStrategy(UpdateFileStrategy, LocalEventStrategy):
         conflicted_name = self._get_free_file_name(
             self.event.file.name, fs)
         try:
-            fs.copy_file(self.event.file.path, conflicted_name)
+            fs.copy_file(self.event.file.path, conflicted_name,
+                         is_offline=self.event.file.is_offline)
         except fs.Exceptions.FileNotFound:
             logger.warning("Can't copy file. File does not exist %s",
                            self.event.file.path)
@@ -83,7 +86,7 @@ class LocalUpdateFileStrategy(UpdateFileStrategy, LocalEventStrategy):
 class RemoteUpdateFileStrategy(UpdateFileStrategy, RemoteEventStrategy):
     def __init__(self, db, event, last_server_event_id,
                  patches_storage, copies_storage,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         self._patches_storage = patches_storage
         self._copies_storage = copies_storage
         self._must_download_copy = False
@@ -92,22 +95,24 @@ class RemoteUpdateFileStrategy(UpdateFileStrategy, RemoteEventStrategy):
             db=db,
             event=event,
             last_server_event_id=last_server_event_id,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     def _apply_event(self, session, fs, excluded_dirs,
                      patches_storage):
         assert self.event.diff_file_uuid
 
         logger.debug('Applying update %s', self.event.file.path)
-        if self.file_download:
-            if self.event.file_size:
+        if self.file_download or not self.event.file.is_offline:
+            if self.event.file_size and self.event.file.is_offline:
                 self._create_file_from_copy(self.event.file.path, fs,
                                             search_by_id=True)
             else:
                 fs.create_empty_file(self.event.file.path,
                                      self.event.file_hash,
                                      self.event.file_id,
-                                     search_by_id=True)
+                                     search_by_id=True,
+                                     is_offline=self.event.file.is_offline)
         else:
             assert self.event.diff_file_size
             if not self._apply_patch(

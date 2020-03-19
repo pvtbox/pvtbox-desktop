@@ -64,6 +64,11 @@ class File(Base):
     # Flag to mark folder as collaborated
     is_collaborated = Column(Boolean(), nullable=True, default=False,
                              index=True)
+    # Flag to mark files being offline as opposite to file links
+    is_offline = Column(Boolean(), nullable=False, default=True, index=True)
+
+    # Flag to mark files to change offline flag
+    toggle_offline = Column(Boolean(), nullable=False, default=False)
 
     def __repr__(self):
         return \
@@ -75,10 +80,12 @@ class File(Base):
             "is_folder={self.is_folder}, " \
             "folder_id={self.folder_id}, " \
             "last_skipped_event_id={self.last_skipped_event_id}, " \
-            "ignored={self.ignored} " \
-            "excluded={self.excluded} "\
-            "is_collaborated={self.is_collaborated}"\
-            ")"\
+            "ignored={self.ignored}, " \
+            "excluded={self.excluded}, " \
+            "is_collaborated={self.is_collaborated}, " \
+            "is_offline={self.is_offline}, " \
+            "toggle_offline={self.toggle_offline}" \
+            ")" \
             .format(self=self)
 
     # Relationship to obtain most recent Event object for the file

@@ -17,7 +17,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Choose folders for selective sync</string>
+   <string>Choose offline folders for SmartSync+</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <property name="leftMargin">
@@ -75,7 +75,7 @@
      background: none;
  }</string>
      </property>
-     <layout class="QVBoxLayout" name="verticalLayout">
+     <layout class="QVBoxLayout" name="verticalLayout_2">
       <item>
        <widget class="QLabel" name="label">
         <property name="font">
@@ -85,21 +85,43 @@
          </font>
         </property>
         <property name="text">
-         <string>Only selected folders will sync to this Computer</string>
+         <string>Only selected folders will be available offline</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QTreeView" name="folder_list_view">
-        <property name="palette">
-         <palette>
-          <active/>
-          <inactive/>
-          <disabled/>
-         </palette>
+       <widget class="QStackedWidget" name="stackedWidget">
+        <property name="currentIndex">
+         <number>0</number>
         </property>
-        <property name="styleSheet">
-         <string notr="true">QTreeView { border: 1px solid #aaaaaa; outline: none;}
+        <widget class="QWidget" name="page">
+         <layout class="QVBoxLayout" name="verticalLayout_3">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QTreeView" name="folder_list_view">
+            <property name="palette">
+             <palette>
+              <active/>
+              <inactive/>
+              <disabled/>
+             </palette>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">QTreeView { border: 1px solid #aaaaaa; outline: none;}
 QTreeView::indicator{width: 16px; height: 16px;}
 QTreeView::indicator:checked:hover{image: url(:/images/check_radio/check_marked_hovered.svg);}
 QTreeView::indicator:checked{image: url(:/images/check_radio/check_marked_hovered.svg);}
@@ -146,16 +168,105 @@ QTreeView::branch:open:has-children:has-siblings  {
         image: url(:/images/check_radio/chevron_right.svg);
 		selection-background-color: none;
 }</string>
-        </property>
-        <property name="verticalScrollBarPolicy">
-         <enum>Qt::ScrollBarAsNeeded</enum>
-        </property>
-        <property name="sortingEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="headerHidden">
-         <bool>false</bool>
-        </property>
+            </property>
+            <property name="verticalScrollBarPolicy">
+             <enum>Qt::ScrollBarAsNeeded</enum>
+            </property>
+            <property name="sortingEnabled">
+             <bool>true</bool>
+            </property>
+            <property name="headerHidden">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="page_2">
+         <layout class="QVBoxLayout" name="verticalLayout">
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>88</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <spacer name="horizontalSpacer_4">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+            <item>
+             <widget class="QLabel" name="loader_label">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>120</width>
+                <height>120</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>120</width>
+                <height>120</height>
+               </size>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="horizontalSpacer_3">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <spacer name="verticalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>88</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
        </widget>
       </item>
       <item>

@@ -30,7 +30,6 @@ import webbrowser
 from service.network.network_speed_calculator import NetworkSpeedCalculator
 
 from PySide2.QtCore import QTimer, Signal, QObject, Qt
-from PySide2.QtGui import QImageReader
 
 from common.utils import get_platform
 
@@ -52,7 +51,7 @@ from common.constants import STATUS_WAIT, STATUS_PAUSE, STATUS_IN_WORK, \
     SS_STATUS_SYNCING, SS_STATUS_SYNCED, SS_STATUS_PAUSED, SUBSTATUS_SYNC, \
     STATUS_INDEXING, STATUS_INIT, STATUS_DISCONNECTED, STATUS_LOGGEDOUT, \
     SS_STATUS_INDEXING, SS_STATUS_LOGGEDOUT, SUBSTATUS_APPLY, \
-    DISK_LOW_ORANGE, DISK_LOW_RED, \
+    DISK_LOW_ORANGE, DISK_LOW_RED, FILE_LINK_SUFFIX, \
     NETWORK_WEBRTC_RELAY, NETWORK_WEBRTC_DIRECT, CONNECTIVITY_ALIVE_TIMEOUT
 from .upload_task_handler import UploadTaskHandler
 from common.logging_setup import set_economode, disable_file_logging
@@ -390,11 +389,6 @@ class ApplicationWorker(QObject):
         return True
 
     def start_work(self):
-        supported_image_formats = map(
-            str, QImageReader.supportedImageFormats())
-        logger.info(
-            "Supported image formats: %s", ', '.join(supported_image_formats))
-
         self._gui_connected.connect(self._on_gui_connected,
                                     Qt.QueuedConnection)
         self._service_server = ServiceServer(get_cfg_dir(create=True))
@@ -524,6 +518,7 @@ class ApplicationWorker(QObject):
         self._sync.status_changed.connect(self._on_sync_status_changed)
         self._sync.license_type_changed.connect(self._gui.license_type_changed)
         self._sync.file_moved.connect(self._gui.on_file_moved)
+        self._sync.offline_dirs.connect(self._gui.offline_dirs)
 
     def _connect_upload_handler_signals(self):
         self._upload_handler.progress.connect(self._gui.download_progress)
@@ -655,6 +650,9 @@ class ApplicationWorker(QObject):
 
         self._gui.revert_downloads.connect(self._on_revert_downloads)
         self._gui.add_to_sync_folder.connect(self._on_add_to_sync_folder)
+
+        self._gui.get_offline_dirs.connect(self._sync.get_offline_dirs)
+        self._gui.set_offline_dirs.connect(self._set_offline_dirs)
 
     def _connect_tx_signals(self):
         # connect traffic info signals
@@ -827,14 +825,14 @@ class ApplicationWorker(QObject):
                 logger.verbose("Sharing changed. Uuids: %s", shared)
             except AttributeError:
                 pass
-        paths = self.get_shared_paths(shared)
+        paths = self.get_shared_paths(shared, soft_paths=True)
         if paths is None:
             self._share_info_timer.start()
             return
 
         self.share_changed.emit(paths)
 
-    def get_shared_paths(self, shared=None):
+    def get_shared_paths(self, shared=None, soft_paths=False):
         if shared is None:
             shared = self._ss_client.get_sharing_info()
 
@@ -851,7 +849,10 @@ class ApplicationWorker(QObject):
                                      files)
                         return None
 
-                    return [FilePath(file.path) for file in files]
+                    return [
+                        FilePath(file.path if file.is_offline or soft_paths
+                                 else file.path + FILE_LINK_SUFFIX)
+                        for file in files]
         except EventsDbBusy:
             logger.debug("Events db busy")
             return None
@@ -930,7 +931,7 @@ class ApplicationWorker(QObject):
         self._tracker.set_session_user_id(
             self._cfg.get_setting('user_hash', 'unknown'))
 
-    def on_login_slot(self, login_data, new_user, download_backups,
+    def on_login_slot(self, login_data, new_user, download_backups, smart_sync,
                       check_consistency=True):
         if self._logged_in:
             return
@@ -940,7 +941,7 @@ class ApplicationWorker(QObject):
                 self._sync.check_if_sync_folder_is_removed():
             QTimer.singleShot(
                 500, lambda: self.on_login_slot(
-                    login_data, new_user, download_backups,
+                    login_data, new_user, download_backups, smart_sync,
                     check_consistency=False))
             logger.debug("Sync folder removed, try login later")
             return
@@ -966,7 +967,7 @@ class ApplicationWorker(QObject):
             logger.warning("can't init file list. Reason: %s", e)
 
         self._set_changed_settings(login_data, check_consistency,
-                                   download_backups, new_user)
+                                   download_backups, smart_sync, new_user)
         # handle remote actions
         if 'remote_actions' in login_data and login_data['remote_actions']:
             remote_actions = login_data['remote_actions']
@@ -1000,7 +1001,7 @@ class ApplicationWorker(QObject):
         self._info_collector.start()
 
     def _set_changed_settings(self, login_data, check_consistency,
-                              download_backups, new_user):
+                              download_backups, smart_sync, new_user):
         user_email = login_data['user_email']
         if user_email != self._cfg.last_user_email or new_user \
                 or not check_consistency:
@@ -1019,6 +1020,7 @@ class ApplicationWorker(QObject):
             user_hash=login_data['user_hash'],
             node_hash=login_data['node_hash'],
             download_backups=download_backups,
+            smart_sync=smart_sync,
         ))
 
         self._cfg.set_settings(changed_settings)
@@ -1036,6 +1038,10 @@ class ApplicationWorker(QObject):
             shell_integration_signals.download_link.emit(
                 self._args['download_link'])
             del self._args['download_link']
+        if 'offline_on' in self._args and self._args['offline_on']:
+            shell_integration_signals.offline_paths.emit(
+                [self._args['offline_on']], True)
+            del self._args['offline_on']
 
     def _on__clean_old_events_timeout(self):
         if not self._last_event_uuid:
@@ -1091,6 +1097,7 @@ class ApplicationWorker(QObject):
             user_password_hash=on_user_password_hash_changed,
             excluded_dirs=self._sync.set_excluded_dirs,
             download_backups=self._sync.download_backups_changed,
+            smart_sync=self._on_smart_sync_changed,
             host=self._web_api.set_uris(),
             tracking_address=self._apply_tracking_address,
         )
@@ -1715,3 +1722,11 @@ class ApplicationWorker(QObject):
     def _apply_tracking_address(self):
         if self._tracker:
             self._tracker.set_tracking_address(self._cfg.tracking_address)
+
+    def _on_smart_sync_changed(self):
+        shell_integration_signals.smart_sync_changed.emit()
+        self._sync.smart_sync_changed()
+
+    def _set_offline_dirs(self, offline_dirs, online_dirs):
+        shell_integration_signals.offline_paths.emit(offline_dirs, True)
+        shell_integration_signals.offline_paths.emit(online_dirs, False)

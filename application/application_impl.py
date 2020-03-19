@@ -27,7 +27,7 @@ import sys
 from PySide2.QtCore import QObject
 
 from common.tools.shell_integration_client import send_show_command
-from common.utils import get_cfg_filename
+from common.utils import get_cfg_filename, register_smart
 from common.logging_setup import clear_old_logs
 
 from application import GUI
@@ -78,7 +78,7 @@ class ApplicationImpl(QObject):
 
         # Acquire lock file to prevent multiple app instances launching
         lock_acquired = self.acquire_lock()
-        if not lock_acquired:
+        if not is_portable() and (not lock_acquired or is_already_started()):
             if 'wipe_internal' in args and args['wipe_internal']:
                 from common.tools import send_wipe_internal
                 send_wipe_internal()
@@ -89,6 +89,9 @@ class ApplicationImpl(QObject):
                 elif 'copy' in args and args['copy']:
                     from common.tools import send_copy_to_sync_dir
                     send_copy_to_sync_dir(args['copy'])
+                elif 'offline_on' in args and args['offline_on']:
+                    from common.tools import send_offline_on
+                    send_offline_on(args['offline_on'])
 
                 send_show_command()
             logger.error("Application started already. Exiting")
@@ -96,12 +99,14 @@ class ApplicationImpl(QObject):
             raise SystemExit(0)
 
         # Exit when attempt to run portable from different location
-        if is_portable():
+        elif is_portable():
             logger.debug("Portable detected")
             if is_already_started():
                 logger.error("Application already started. Exiting")
                 send_show_command()
                 raise SystemExit(0)
+
+        register_smart()
 
         sync_folder_removed = args.get('sync_folder_removed', False)
         logging_disabled = args.get('logging_disabled', False)

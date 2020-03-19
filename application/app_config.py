@@ -98,12 +98,13 @@ class MainConfigLoader(config.ConfigLoader):
             user_email=None,
             user_password_hash=None,
             devices=dict(),
-            autoupdate = True,
-            next_update_check = 0,
+            autoupdate=True,
+            next_update_check=0,
             logging_disabled=False,
             download_backups=False,
             host=REGULAR_URI,
             old_host=REGULAR_URI,
+            smart_sync=True,
         )
 
     def check(self):
@@ -128,9 +129,11 @@ class MainConfigLoader(config.ConfigLoader):
             'host'
         assert isinstance(self.config.get('old_host'), str), \
             'old_host'
+        assert isinstance(self.config.get('smart_sync'), bool), \
+            'smart_sync'
         # if new key is added to config, it's mandatory to use 'get(key)'
         # here, not pure  self.config[key]
 
 
-def load_config(config_file='main.conf'):
-    return config.load_config(config_file, MainConfigLoader)
+def load_config(config_file='main.conf', check=True):
+    return config.load_config(config_file, MainConfigLoader, check=check)

@@ -35,13 +35,15 @@ class GuiProxy(MessageProxy):
     received_download_link = Signal(str, str)
     share_path_requested = Signal(str)
     gui_settings_changed = Signal(dict)
-    gui_logged_in = Signal(dict, bool, bool)
+    gui_logged_in = Signal(dict, bool, bool, bool)
     exit_service = Signal()
     remote_action = Signal(dict)
     file_list_ready = Signal()
     is_saved_to_clipboard = Signal(bool)
     revert_downloads = Signal(list, list, list)
     add_to_sync_folder = Signal(list)
+    get_offline_dirs = Signal()
+    set_offline_dirs = Signal(list, list)
 
     def __init__(self, parent=None, receivers=(), socket_client=None):
         self._receivers = list(receivers)
@@ -314,3 +316,6 @@ class GuiProxy(MessageProxy):
 
     def show_collaboration_settings(self, rel_path, uuid):
         self.send_message("show_collaboration_settings", [rel_path, uuid])
+
+    def offline_dirs(self, paths):
+        self.send_message("offline_dirs", [paths])

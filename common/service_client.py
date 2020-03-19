@@ -267,7 +267,8 @@ class ServiceClient(object):
             if not self._start_only:
                 self._loop.call_later(
                     self.start_service_timeout, self._drop_starting_service)
-            self._starting_service_signal.emit()
+            if self._starting_service_signal:
+                self._starting_service_signal.emit()
 
         if not self._start_only:
             self._loop.call_later(

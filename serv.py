@@ -82,6 +82,10 @@ def parseArgs(argv=sys.argv[1:]):
         help='copy content specified by path to sync directory'
     )
     parser.add_argument(
+        '--offline-on', type=str,
+        help='make file accessible offline'
+    )
+    parser.add_argument(
         '--update-branch', type=str,
         help='update branch for application'
     )

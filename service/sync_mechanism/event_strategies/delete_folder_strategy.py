@@ -37,13 +37,15 @@ class DeleteFolderStrategy(object):
 
 
 class LocalDeleteFolderStrategy(DeleteFolderStrategy, LocalDeleteFileStrategy):
-    def __init__(self, db, event, folder_path, get_download_backups_mode):
+    def __init__(self, db, event, folder_path, get_download_backups_mode,
+                 is_smart_sync=False):
         assert not event.diff_file_size
         super(LocalDeleteFolderStrategy, self).__init__(
             db=db,
             event=event,
             file_path=folder_path,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     ''' Overloaded methods ====================================================
     '''
@@ -78,13 +80,15 @@ class RemoteDeleteFolderStrategy(DeleteFolderStrategy,
                                  RemoteDeleteFileStrategy):
     """Handle 'delete' file_event received from signal server"""
     def __init__(self, db, event, last_server_event_id, copies_storage=None,
-                 get_download_backups_mode=lambda:None):
+                 get_download_backups_mode=lambda:None,
+                 is_smart_sync=False):
         super(RemoteDeleteFolderStrategy, self).__init__(
             db=db,
             event=event,
             last_server_event_id=last_server_event_id,
             copies_storage=copies_storage,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     @db_read
     def skip_if_file_will_be_deleted(self, session):

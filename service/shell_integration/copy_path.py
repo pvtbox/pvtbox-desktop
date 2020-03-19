@@ -31,6 +31,7 @@ from service.shell_integration.signals import signals
 from common.translator import tr
 from common.utils import get_dir_size, get_free_space, copy_file, get_next_name
 from common.file_path import FilePath
+from common.constants import FILE_LINK_SUFFIX
 
 
 # Setup logging
@@ -79,13 +80,21 @@ def add_to_sync_dir(paths, move, callback):
     logger.debug("Copying %d paths", len(paths))
     signals.show.emit()
     result_paths = []
+    offline_paths = []
+    online_paths = []
     for path in paths:
+        is_file = op.isfile(path)
         path = FilePath(path)
         # Path is in sync directory already
         if path in FilePath(root):
             logger.debug("Path '%s' is in sync directory '%s' already",
                            path, root)
             result_paths.append(path)
+            if is_file and not move:
+                if path.endswith(FILE_LINK_SUFFIX):
+                    online_paths.append(path)
+                else:
+                    offline_paths.append(path)
             continue
 
         if not op.exists(path.longpath):
@@ -101,7 +110,6 @@ def add_to_sync_dir(paths, move, callback):
 
         basename = op.basename(path)
         destname = get_next_name(FilePath(op.join(root, basename)).longpath)
-        is_file = op.isfile(path)
 
         if not _check_free_space(path, root, move, is_file):
             continue
@@ -132,6 +140,12 @@ def add_to_sync_dir(paths, move, callback):
         signals.copying_finished.emit(path)
         result_paths.append(destname)
         logger.debug("Copied successfully")
+
+    if offline_paths:
+        signals.offline_paths.emit(offline_paths, False)
+    if online_paths:
+        signals.offline_paths.emit(online_paths, True)
+
     logger.debug("All paths copied")
     if callable(callback):
         callback(result_paths)

@@ -91,6 +91,12 @@ class FolderUUIDNotFound(FileEventsDBError):
             "Folder not found by uuid '{}'".format(folder_uuid))
 
 
+class FileUUIDNotFound(FileEventsDBError):
+    def __init__(self, file_uuid):
+        super(FileUUIDNotFound, self).__init__(
+            "File (folder) not found by uuid '{}'".format(file_uuid))
+
+
 class EventsDbBusy(FileEventsDBError):
     def __init__(self):
         super(EventsDbBusy, self).__init__(
@@ -1210,7 +1216,7 @@ class FileEventsDB(object):
                 .having(Event.type != 'delete') \
                 .all()
             if folder_event_ids:
-                folder_event_ids = zip(*folder_event_ids)[0]
+                folder_event_ids = list(zip(*folder_event_ids))[0]
                 session.bulk_update_mappings(
                     Event, [{'id': e_id, 'state': 'downloaded'}
                             for e_id in folder_event_ids])
@@ -1228,6 +1234,108 @@ class FileEventsDB(object):
                 folder.id, session, is_excluded)
 
     @with_session
+    def mark_child_offline(self, file_id, session=None, is_offline=True,
+                           read_only=False):
+        not_offline = int(not is_offline)
+        files_query = session.query(File) \
+            .filter(File.is_folder == 0) \
+            .filter(File.is_offline == not_offline)
+        if file_id:
+            files_query = files_query.filter(File.folder_id == file_id)
+        else:
+            files_query = files_query.filter(File.folder_id.is_(None))
+        files = files_query.all()
+        files_registered = {
+            f for f in files
+            if all(e.state not in ('occured', 'conflicted')
+                   for e in f.events)}
+        files_unregistered = set(files) - files_registered
+        not_applied = sum(len(f.events) for f in files_registered) \
+            if files_registered else 0
+        session.bulk_update_mappings(
+            File,
+            [{'id': f.id, 'is_offline': is_offline, 'event_id': None,
+              'last_skipped_event_id': None, 'toggle_offline': False}
+             for f in files_registered])
+        session.bulk_update_mappings(
+            Event,
+            [{'id': f.events[-1].id, 'state': 'received'}
+             for f in files_registered])
+        session.bulk_update_mappings(
+            File,
+            [{'id': f.id, 'toggle_offline': True}
+             for f in files_unregistered])
+
+        folders_query = session.query(File) \
+            .filter(File.is_folder)
+        if file_id:
+            folders_query = folders_query.filter(File.folder_id == file_id)
+        else:
+            folders_query = folders_query.filter(File.folder_id.is_(None))
+        folders = folders_query.all()
+        folders_query \
+            .update(dict(is_offline=is_offline),
+                    synchronize_session=False)
+        for folder in folders:
+            not_applied += self.mark_child_offline(
+                folder.id, session, is_offline)
+        return not_applied
+
+    @with_session
+    def make_offline(self, uuid, session=None, is_offline=True,
+                     read_only=False):
+        if not uuid:
+            return self.mark_child_offline(None, session, is_offline)
+
+        file = self.get_file_by_uuid(uuid, session=session)
+        if not file.is_folder and any(
+                e.state in ('occured', 'conflicted') for e in file.events):
+            file.toggle_offline = True
+            return 0
+
+        file.is_offline = is_offline
+        file.toggle_offline = False
+        if file.is_folder:
+            not_applied = self.mark_child_offline(file.id, session, is_offline)
+        else:
+            event = file.events[-1]
+            event.state = 'received'
+            file.event_id = None
+            not_applied = len(file.events)
+        return not_applied
+
+    @with_session
+    def get_offline_statuses(self, paths, session=None):
+        statuses = list()
+        for path in paths:
+            file = self.find_file_by_relative_path(path, session=session)
+            statuses.append(file.is_offline)
+        return statuses
+    
+    @with_session
+    def has_online(self, session=None):
+        count = session.query(func.count()) \
+            .filter(File.is_offline == 0).scalar()
+        return count > 0
+
+    @with_session
+    def get_offline_dirs(self, session=None):
+        files = session.query(File) \
+            .filter(File.is_offline) \
+            .filter(File.is_folder) \
+            .all()
+        paths = [f.path for f in files]
+        return paths
+
+    @with_session
+    def get_files_with_offline_status(self, is_offline=1, session=None):
+        files = session.query(File) \
+            .filter(File.is_offline == is_offline) \
+            .filter(File.is_folder == 0) \
+            .all()
+        return files
+
+    @with_session
     def get_folder_by_uuid(self, uuid, session=None):
         if not uuid:
             return None
@@ -1241,6 +1349,20 @@ class FileEventsDB(object):
             raise FolderUUIDNotFound(uuid)
 
         return folder
+
+    @with_session
+    def get_file_by_uuid(self, uuid, session=None):
+        if not uuid:
+            return None
+
+        try:
+            file = session.query(File) \
+                .filter(File.uuid == uuid) \
+                .one()
+        except:
+            raise FileUUIDNotFound(uuid)
+
+        return file
 
     def get_sessions_count(self):
         with self._sessions_count_lock:
@@ -1414,3 +1536,10 @@ class FileEventsDB(object):
             .filter(not_(Event.outdated)) \
             .all()
         return events
+
+    def migrate_from_excluded_to_online(self):
+        with self.create_session(read_only=False) as session:
+            session.query(File) \
+                .filter(File.excluded) \
+                .update(dict(is_offline=False),
+                        synchronize_session=False)

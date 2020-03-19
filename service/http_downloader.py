@@ -148,7 +148,12 @@ class HttpDownloader(object):
                                              do_post_request,
                                              timeout,
                                              proceed)
-        return loop.run_until_complete(coro)
+        try:
+            return loop.run_until_complete(coro)
+        except Exception as e:
+            error_cb = self._params.get('download_error_cb')
+            if callable(error_cb):
+                error_cb(id, str(e))
 
     @asyncio.coroutine
     def _download_task_coroutine(self,
@@ -185,6 +190,11 @@ class HttpDownloader(object):
                     "Error connecting to http server")
                 if i == num_tries - 1:
                     raise Exception("Connection error")
+            except Exception as e:
+                logger.warning(
+                    "Unexpected error", e)
+                if i == num_tries - 1:
+                    raise
         else:
             raise Exception("Request to http server failed")
 

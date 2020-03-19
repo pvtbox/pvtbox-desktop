@@ -27,6 +27,7 @@ from common.file_path import FilePath
 from service.shell_integration import params
 from .signals import signals
 from .share_path import is_paths_shared
+from .offline_path import get_offline_status
 
 
 # Setup logging
@@ -40,6 +41,7 @@ ALLOWED_COMMANDS = (
     'sync_dir', 'download_link', 'show', 'is_shared', 'wipe_internal',
     'status_subscribe', 'status_unsubscribe', 'refresh',
     'share_copy', 'share_move', 'collaboration_settings', 'file_info',
+    'offline_on', 'offline_off', 'offline_status', 'smart_sync'
 )
 
 FILE_NOT_FOUND = 0
@@ -183,4 +185,17 @@ def get_is_sharing_reply(paths):
 def get_share_copy_move_reply(paths, links, context, move=False):
     command = "share_move" if move else "share_copy"
     cmd = dict(cmd=command, paths=paths, links=links, context=context)
+    return json.dumps(cmd)
+
+
+def get_offline_status_reply(paths):
+    offline_status = get_offline_status(paths)
+    offline_status_str = "offline" if offline_status == 1 \
+        else "online" if offline_status == 0 \
+        else "no_smart_sync"
+    return create_command('offline_status', offline_status_str)
+
+
+def get_smart_sync_reply():
+    cmd = dict(cmd='smart_sync', enabled=params.cfg.smart_sync)
     return json.dumps(cmd)

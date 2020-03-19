@@ -90,7 +90,8 @@ class EventQueueProcessor(object):
             excluded_dirs=(),
             check_processing_timeout=RETRY_DOWNLOAD_TIMEOUT,
             collaborated_folders=(),
-            get_download_backups_mode=lambda: None):
+            get_download_backups_mode=lambda: None,
+            get_smart_sync_mode=lambda: False):
         super(EventQueueProcessor, self).__init__()
 
         self.collaboration_alert_is_active = threading.Event()
@@ -110,6 +111,7 @@ class EventQueueProcessor(object):
         self._check_processing_events_timer = None
         self._check_processing_events_timeout = check_processing_timeout
         self._get_download_backups_mode = get_download_backups_mode
+        self._get_smart_sync_mode = get_smart_sync_mode
 
         self._tracker = tracker
         self._statistic = defaultdict(int)
@@ -370,7 +372,8 @@ class EventQueueProcessor(object):
                 self._statistic['received'] += 1
                 strategy = create_strategy_from_remote_event(
                     self._db, message, self._patches_storage,
-                    self._copies_storage, self._get_download_backups_mode)
+                    self._copies_storage, self._get_download_backups_mode,
+                    is_smart_sync=self._get_smart_sync_mode())
 
                 if self._license_type == FREE_LICENSE and \
                         not strategy.event.erase_nested:
@@ -457,12 +460,14 @@ class EventQueueProcessor(object):
         logger.info("new local message is received: %s", msg)
         event_strategy = create_strategy_from_local_event(
             self._db, msg, self._license_type, self._patches_storage,
-            self._get_download_backups_mode)
+            self._get_download_backups_mode,
+            is_smart_sync=self._get_smart_sync_mode())
+        is_offline = not fs_event.is_link if fs_event else True
 
         if event_strategy.event.type in ('create', 'move',):
-            self._check_move_to_excluded(msg)
+            self._check_move_to_excluded(msg, is_offline)
             if event_strategy.event.type == 'move':
-                self._process_collaboration_move(msg, fs_event)
+                self._process_collaboration_move(msg, fs_event, is_offline)
 
         lock_acquired = False
         try:
@@ -482,7 +487,7 @@ class EventQueueProcessor(object):
             if event_strategy.event.type in ('create', 'update') \
                     and not generated:
                 has_conflict, to_process, file_id = self.check_conflict(
-                    event_strategy)
+                    event_strategy, is_offline)
                 if has_conflict:
                     if not to_process:
                         fs_event.file.events_file_id = file_id
@@ -513,7 +518,7 @@ class EventQueueProcessor(object):
             if lock_acquired:
                 self._db.db_lock.release()
 
-    def _process_collaboration_move(self, msg, fs_event):
+    def _process_collaboration_move(self, msg, fs_event, is_offline):
         new_path = msg['dst']
         old_path = msg['src']
         src_root = get_relative_root_folder(old_path)
@@ -537,10 +542,13 @@ class EventQueueProcessor(object):
             events_file_id = fs_event.file.events_file_id if fs_event else None
             try:
                 self._fs.accept_move(new_path, old_path, is_directory,
-                                     events_file_id=events_file_id)
-                self._fs.copy_file(old_path, new_path, is_directory)
+                                     events_file_id=events_file_id,
+                                     is_offline=is_offline)
+                self._fs.copy_file(old_path, new_path, is_directory,
+                                   is_offline=is_offline)
                 self._fs.accept_delete(old_path, is_directory,
-                                       events_file_id=events_file_id)
+                                       events_file_id=events_file_id,
+                                       is_offline=is_offline)
             except self._fs.Exceptions.FileNotFound as e:
                 logger.warning("File %s not found in "
                                "processing collaboration move", e.file)
@@ -548,7 +556,7 @@ class EventQueueProcessor(object):
                 logger.error("Error processing collaboration move (%s)", e)
         raise EventConflicted
 
-    def _check_move_to_excluded(self, msg):
+    def _check_move_to_excluded(self, msg, is_offline):
         new_path = msg.get('dst', None)
         if not new_path:
             new_path = msg['path']
@@ -563,23 +571,26 @@ class EventQueueProcessor(object):
             try:
                 self._fs.move_file(
                     src=new_path,
-                    dst=conflicted_name)
+                    dst=conflicted_name,
+                    is_offline=is_offline)
             except Exception as e:
                 logger.error("Error processing move to excluded (%s)", e)
             raise EventConflicted
 
     def append_local_event(self, event, file_path, new_file_path=None,
-                           file_id=None):
+                           file_id=None, is_offline=True):
         logger.info("new local event appending: %s", event)
         event_strategy = create_local_stategy_from_event(
             self._db, event, file_path, self._license_type, new_file_path,
-            self._get_download_backups_mode)
+            self._get_download_backups_mode,
+            is_smart_sync=self._get_smart_sync_mode())
         event_strategy.file_id = file_id
 
         with self._db.db_lock:
             logger.debug("add_to_local_database %s", event_strategy)
             event_strategy.add_to_local_database(
-                patches_storage=self._patches_storage)
+                patches_storage=self._patches_storage,
+                is_offline=is_offline)
             self.change_processing_events_counts(local_inc=1)
             self.events_added.set()
 
@@ -851,7 +862,8 @@ class EventQueueProcessor(object):
             strategy = create_strategy_from_database_event(
                 self._db, event, self._license_type,
                 self._patches_storage, self._copies_storage,
-                self._get_download_backups_mode)
+                self._get_download_backups_mode,
+                is_smart_sync=self._get_smart_sync_mode())
             with self._processing_events_lock:
                 if strategy.event.file_id in self._processing_local_files \
                         or not strategy.event.is_folder and \
@@ -896,7 +908,8 @@ class EventQueueProcessor(object):
             prev_strategy = create_strategy_from_database_event(
                 self._db, prev_event, self._license_type,
                 self._patches_storage, self._copies_storage,
-                self._get_download_backups_mode)
+                self._get_download_backups_mode,
+                is_smart_sync=self._get_smart_sync_mode())
             prev_strategy.force_move()
             self._add_event_for_processing(prev_strategy)
 
@@ -1573,16 +1586,24 @@ class EventQueueProcessor(object):
             if applied_event:
                 try:
                     self._fs.accept_delete(file_path,
-                                           events_file_id=file.id)
+                                           events_file_id=file.id,
+                                           is_offline=file.is_offline)
                 except Exception as e:
                     logger.warning("Can't delete reverted file %s. "
                                    "Reason %s", file, e)
                     applied_event = False
                 if applied_event:
                     try:
-                        self._fs.create_file_from_copy(
-                            new_file_path, new_create_event.file_hash,
-                            events_file_id=None)
+                        if new_create_event.file_size and file.is_offline:
+                            self._fs.create_file_from_copy(
+                                new_file_path, new_create_event.file_hash,
+                                events_file_id=None)
+                        else:
+                            self._fs.create_empty_file(
+                                new_file_path,
+                                new_create_event.file_hash,
+                                events_file_id=None,
+                                is_offline=file.is_offline)
                         self.append_local_event(new_create_event,
                                                 new_file_path)
                     except Exception as e:
@@ -1598,7 +1619,8 @@ class EventQueueProcessor(object):
             strategy = create_strategy_from_database_event(
                 self._db, event, self._license_type,
                 self._patches_storage, self._copies_storage,
-                self._get_download_backups_mode)
+                self._get_download_backups_mode,
+                is_smart_sync=self._get_smart_sync_mode())
             return strategy
         else:
             return event_strategies[0]
@@ -1617,7 +1639,7 @@ class EventQueueProcessor(object):
             all_strategies))
         return event_strategies
 
-    def check_conflict(self, strategy):
+    def check_conflict(self, strategy, is_offline):
         file_path = strategy.get_dst_path()
         assert file_path
 
@@ -1650,8 +1672,10 @@ class EventQueueProcessor(object):
                         file_path, is_folder=strategy.event.is_folder)
                     self._fs.move_file(
                         src=strategy.get_src_path(),
-                        dst=conflicted_name)
+                        dst=conflicted_name,
+                        is_offline=is_offline)
                 else:
+                    conflicting_file.is_offline = is_offline
                     self._apply_remote_event_for_early_conflict(
                         session, conflicting_event, conflicting_file)
 
@@ -1964,12 +1988,13 @@ class EventQueueProcessor(object):
             try:
                 self._fs.accept_move(new_path, old_path,
                                      is_directory=file.is_folder,
-                                     events_file_id=file.id)
+                                     events_file_id=file.id,
+                                     is_offline=file.is_offline)
                 break
             except self._fs.Exceptions.FileAlreadyExists:
                 try:
                     if not self.rename_or_delete_dst_path(
-                            old_path, file.id, session):
+                            old_path, file.id, session, file.is_offline):
                         raise RenameDstPathFailed
                 except Exception as e:
                     logger.error("Error renaming dst path %s. Reason: %s",
@@ -1978,7 +2003,7 @@ class EventQueueProcessor(object):
             except self._fs.Exceptions.FileNotFound:
                 break
 
-    def rename_or_delete_dst_path(self, path, file_id, session):
+    def rename_or_delete_dst_path(self, path, file_id, session, is_offline):
         files = self._db.find_files_by_relative_path(path, session=session)
         files = [f for f in files if f.id != file_id]
         events_found = False
@@ -2020,11 +2045,13 @@ class EventQueueProcessor(object):
 
             if delete_found:
                 # have delete event not applied
-                self._fs.accept_delete(path, is_directory=is_directory)
+                self._fs.accept_delete(path, is_directory=is_directory,
+                                       is_offline=is_offline)
                 return
 
         try:
-            self._fs.accept_move(path, new_name, is_directory=is_directory)
+            self._fs.accept_move(path, new_name, is_directory=is_directory,
+                                 is_offline=is_offline)
             if not events_found:
                 new_move_event = Event(
                     type='move',
@@ -2035,7 +2062,7 @@ class EventQueueProcessor(object):
                     file_hash=base_event.file_hash,
                     file_name=new_name)
                 self.append_local_event(new_move_event, path, new_name,
-                                        dst_file_id)
+                                        dst_file_id, is_offline)
         except self._fs.Exceptions.FileNotFound:
             pass
         except Exception as e:
@@ -2057,7 +2084,8 @@ class EventQueueProcessor(object):
             strategy = create_strategy_from_database_event(
                 self._db, event, self._license_type,
                 self._patches_storage, self._copies_storage,
-                self._get_download_backups_mode)
+                self._get_download_backups_mode,
+                is_smart_sync=self._get_smart_sync_mode())
             with self._processing_events_lock:
                 if strategy.event.file_id in self._processing_local_files \
                         or strategy.event.file_id in self._processing_events:
@@ -2072,3 +2100,29 @@ class EventQueueProcessor(object):
 
     def set_excluded_dirs(self, excluded_dirs):
         self._excluded_dirs = excluded_dirs
+
+    def cancel_downloads_for_parent_uuid(self, uuid):
+        if not uuid:
+            return
+
+        with self._db.create_session(read_only=True) as session:
+            file = session.query(File).filter(File.uuid == uuid).one_or_none()
+            if not file:
+                logger.warning("Can't find uuid %s to cancel downloads", uuid)
+                return
+
+            parent_path = file.path
+            with self._processing_events_lock:
+                processing_events = list(self._processing_events.values())
+
+            for strategy in processing_events:
+                if strategy.event.state != 'received' or \
+                        strategy.event.is_folder:
+                    continue
+
+                path = strategy.get_file_path(session=session)
+                if is_contained_in_dirs(path, [parent_path]):
+                    self._download_manager.cancel_download(
+                        strategy.event.uuid)
+                    if not file.is_folder:
+                        break

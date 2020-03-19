@@ -30,11 +30,14 @@ class CalculateSignatureAction(ActionBase):
         self._rsync = rsync
 
     def _on_new_event(self, fs_event):
-        try:
-            fs_event.new_signature = self._rsync.block_checksum(
-                FilePath(fs_event.file_recent_copy).longpath)
-        except (IOError, OSError):
-            return self.event_returned(fs_event)
+        if fs_event.is_link:
+            fs_event.new_signature = fs_event.old_signature
+        else:
+            try:
+                fs_event.new_signature = self._rsync.block_checksum(
+                    FilePath(fs_event.file_recent_copy).longpath)
+            except (IOError, OSError):
+                return self.event_returned(fs_event)
 
         self.event_passed(fs_event)
 

@@ -25,9 +25,10 @@ from collections import defaultdict
 from PySide2.QtCore import QObject, Signal, Qt
 
 from common.constants import SS_STATUS_SYNCING, SS_STATUS_SYNCED, \
-    SS_STATUS_PAUSED, SS_STATUS_INDEXING
+    SS_STATUS_PAUSED, SS_STATUS_INDEXING, FILE_LINK_SUFFIX
 from common.file_path import FilePath
 from common.utils import get_platform
+from common.path_converter import PathConverter
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -51,6 +52,7 @@ class FileStatusManager(QObject):
         self._files_disk_error = set()
         self._subscriptions = dict()
         self._not_synced_paths = set()
+        self._pc = PathConverter(self._cfg.sync_directory)
         QObject.__init__(self)
 
         self._check_not_synced.connect(
@@ -63,11 +65,17 @@ class FileStatusManager(QObject):
         logger.debug('connect_sync_signals')
         self._sync.downloads_status.connect(
             self._on_downloads_status)
-        self._sync.file_added_to_indexing.connect(self._on_file_added_to_indexing)
-        self._sync.file_removed_from_indexing.connect(self._on_file_removed_from_indexing)
-        self._sync.file_added_to_ignore.connect(self._on_file_added_to_ignore)
-        self._sync.file_removed_from_ignore.connect(self._on_file_removed_from_ignore)
-        self._sync.file_added_to_disk_error.connect(self._on_file_added_to_disk_error)
+        self._sync.file_added_to_indexing.connect(
+            self._on_file_added_to_indexing)
+        self._sync.file_removed_from_indexing.connect(
+            self._on_file_removed_from_indexing)
+        self._sync.file_added_to_ignore.connect(
+            self._on_file_added_to_ignore)
+        self._sync.file_removed_from_ignore.connect(
+            self._on_file_removed_from_ignore)
+        self._sync.file_added_to_disk_error.connect(
+            self._on_file_added_to_disk_error)
+        self._sync.file_status_refresh.connect(self.on_global_status)
 
     def subscribe(self, client, path):
         logger.debug('subscribe, client: %s, path: %s', client, path)
@@ -92,7 +100,7 @@ class FileStatusManager(QObject):
         self.files_status.emit(
             client, [FilePath(path).shortpath if path
                      else FilePath(self._cfg.sync_directory).shortpath], status)
-        if not is_sync_dir and status != "synced":
+        if not is_sync_dir and status not in ("synced", "online"):
             self._not_synced_paths.add(path)
 
     def unsubscribe(self, client, path):
@@ -118,11 +126,12 @@ class FileStatusManager(QObject):
                         [FilePath(self._cfg.sync_directory).shortpath],
                 "syncing")
 
-    def on_global_status(self, status):
+    def on_global_status(self, status=None):
         was_sync_resuming = self._sync_resuming
         self._sync_resuming = False
         was_error_or_pause = self._status in ('paused', 'error')
-        self._status = self._convert_sync_status(status)
+        if status is not None:
+            self._status = self._convert_sync_status(status)
         if self._status == 'paused':
             self._files_in_indexing.clear()
         logger.debug('on_global_status, status: %s, was_error_or_pause: %s',
@@ -135,7 +144,11 @@ class FileStatusManager(QObject):
                 paths = [p.shortpath for p in paths] + \
                         [FilePath(self._cfg.sync_directory).shortpath]
             else:
-                if was_error_or_pause or was_sync_resuming:
+                force_check = False
+                if self._status == 'synced':
+                    self._files_in_indexing.clear()
+                    force_check = True
+                if was_error_or_pause or was_sync_resuming or force_check:
                     self._check_not_synced.emit()
                 paths = [FilePath(self._cfg.sync_directory).shortpath]
             logger.debug('on_global_status, emit %s: %s for client %s',
@@ -244,10 +257,13 @@ class FileStatusManager(QObject):
         synced_paths = set()
         error_paths = set()
         syncing_paths = set()
+        online_paths = set()
         for path in self._not_synced_paths:
             status = self._get_file_status(path)
             if status == "synced":
                 synced_paths.add(path)
+            elif status == "online":
+                online_paths.add(path)
             elif status == "error":
                 error_paths.add(path)
             elif status == "syncing":
@@ -265,6 +281,13 @@ class FileStatusManager(QObject):
                     self.files_status.emit(
                         client, [p.shortpath for p in client_synced_paths],
                         "synced")
+            if online_paths:
+                client_online_paths = list(paths.intersection(online_paths))
+                if client_online_paths:
+                    logger.debug("emit online: %s to client %s", client_online_paths, client)
+                    self.files_status.emit(
+                        client, [p.shortpath for p in client_online_paths],
+                        "online")
             if error_paths:
                 client_error_paths = list(paths.intersection(error_paths))
                 if client_error_paths:
@@ -304,6 +327,17 @@ class FileStatusManager(QObject):
 
         for syncing_path in chain(self._files_in_indexing, self._files_in_downloading.keys()):
             if syncing_path in path:
+                return "syncing"
+
+        rel_path = self._pc.create_relpath(path)
+        if rel_path.endswith(FILE_LINK_SUFFIX) and \
+                rel_path != FILE_LINK_SUFFIX:
+            return "online"
+        else:
+            st = self._sync.get_offline_status([rel_path], timeout_status=3)
+            if st == 0:
+                return "online"
+            elif st == 3:
                 return "syncing"
 
         return "synced"

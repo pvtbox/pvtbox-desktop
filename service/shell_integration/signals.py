@@ -89,6 +89,10 @@ class ShellIntegrationSignals(QObject):
     # Arguments are: uuids (1 element list) [list], context [str]
     file_info = Signal(list, str)
 
+    # Signal to be emitted on shell commands 'offline_on', 'offline_off'
+    # Arguments are: paths [list], is_offline [bool]
+    offline_paths = Signal(list, bool)
+
     # Signal to be emitted on 'file_info' processed
     # Arguments are: path [str], error [str], context [str]
     file_info_reply = Signal(str, str, str)
@@ -101,6 +105,8 @@ class ShellIntegrationSignals(QObject):
 
     status_subscribe = Signal(str, str)
     status_unsubscribe = Signal(str, str)
+
+    smart_sync_changed = Signal()
 
     def __init__(self, parent=None):
         QObject.__init__(self, parent=parent)

@@ -4,7 +4,7 @@ call pyside2-rcc -o pvtbox_main_rc.py application/ui/pvtbox_main.qrc
 call pyside2-uic -o pvtbox_main.py application/ui/pvtbox_main.ui
 call pyside2-uic -o settings.py application/ui/settings.ui
 call pyside2-uic -o share_files.py application/ui/share_files.ui
-call pyside2-uic -o selective_sync.py application/ui/selective_sync.ui
+call pyside2-uic -o smart_sync.py application/ui/smart_sync.ui
 call pyside2-uic -o device_list.py application/ui/device_list.ui
 call pyside2-uic -o lost_folder_dialog.py application/ui/lost_folder_dialog.ui
 call pyside2-uic -o tutorial.py application/ui/tutorial.ui

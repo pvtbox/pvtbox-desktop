@@ -25,7 +25,7 @@ from os.path import exists, join, relpath
 
 from common.file_path import FilePath
 from common.signal import Signal
-from common.constants import FILE_LIST_COUNT_LIMIT
+from common.constants import FILE_LIST_COUNT_LIMIT, FILE_LINK_SUFFIX
 from common.path_converter import PathConverter
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ class FilesList(object):
                 path = item[0]
 
                 abs_path = self._pc.create_abspath(path)
-                if exists(abs_path):
+                if exists(abs_path) or exists(abs_path + FILE_LINK_SUFFIX):
                     files_to_return.append(item)
                     if len(files_to_return) >= FILE_LIST_COUNT_LIMIT:
                         break

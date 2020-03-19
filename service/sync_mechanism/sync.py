@@ -31,7 +31,7 @@ from PySide2.QtCore import QObject, QThread, Qt, QTimer
 from PySide2.QtCore import Signal as pyqtSignal
 from service.network.leakybucket import ThreadSafeLeakyBucket
 
-from service.events_db import EventsDbBusy
+from service.events_db import EventsDbBusy, FileNotFound
 from common.async_qt import qt_run
 from common.errors import handle_exception
 from common.file_path import FilePath
@@ -39,7 +39,7 @@ from service.monitor import FilesystemMonitor
 from common.constants import STATUS_WAIT, STATUS_PAUSE, STATUS_IN_WORK, \
     STATUS_INDEXING, FREE_LICENSE, DOWNLOAD_PART_SIZE, DOWNLOAD_CHUNK_SIZE, \
     DOWNLOAD_PRIORITY_REVERSED_PATCH, SUBSTATUS_SYNC, SUBSTATUS_SHARE, \
-    license_names, UNKNOWN_LICENSE
+    license_names, UNKNOWN_LICENSE, FILE_LINK_SUFFIX
 from service.monitor.copies.copies import Copies
 from service.monitor.patches.patches import Patches
 from service.network.connectivity.connectivity_service import ConnectivityService
@@ -95,6 +95,7 @@ class Sync(QObject):
     license_type_changed = pyqtSignal(int)
     revert_failed = pyqtSignal(list)
     connected_nodes_changed = pyqtSignal(int)
+    offline_dirs = pyqtSignal(list)
 
     _monitor_idle_signal = pyqtSignal()
     _special_file_event = pyqtSignal(str,   # path
@@ -117,6 +118,7 @@ class Sync(QObject):
     file_added_to_indexing = pyqtSignal(FilePath)
     file_removed_from_indexing = pyqtSignal(FilePath, bool)
     file_added_to_disk_error = pyqtSignal(FilePath)
+    file_status_refresh = pyqtSignal()
 
     events_check_after_checked_interval = 30 * 60 * 1000
     events_check_after_online_interval = 60 * 1000
@@ -363,6 +365,13 @@ class Sync(QObject):
     def _on_license_downgraded_to_free(self):
         self._clear_excluded()
         self._delete_on_license_downgrade()
+
+        self._cfg.smart_sync = False
+        self._cfg.sync()
+        started = self._started
+        self._started = False
+        self.smart_sync_changed()
+        self._started = started
 
     def _on_license_upgraded_from_free(self):
         logger.info('License upgraded from free')
@@ -649,6 +658,8 @@ class Sync(QObject):
             events_db=self._db)
         self._connect_copies_patches_signals()
 
+        # clear excluded dirs if any to migrate on smart sync
+        self._migrate_from_selective_to_smart_sync()
         self._excluded_dirs_relpaths = self._cfg.excluded_dirs
         pc = PathConverter(self._root)
         excluded_dirs_abs_paths = list(map(
@@ -684,7 +695,8 @@ class Sync(QObject):
             notify_patches_ready_callback=self._ss_client.send_patches_info,
             excluded_dirs=self._excluded_dirs_relpaths,
             collaborated_folders=self._collaborated_folders,
-            get_download_backups_mode=self._get_download_backups_mode)
+            get_download_backups_mode=self._get_download_backups_mode,
+            get_smart_sync_mode=lambda: self._cfg.smart_sync)
 
         with self._excluded_lock:
             excluded_set = self._excluded_set
@@ -899,8 +911,8 @@ class Sync(QObject):
         '''
         Returns uuid for path specified
 
-        @param path relative path for file [unicode]
-
+        @param path relative path for file [str]
+        @param timeout events db lock timeout (seconds) [float]
         @return file_uuid[str]
         '''
         try:
@@ -915,9 +927,8 @@ class Sync(QObject):
     def get_folder_uuid(self, path, timeout=2.0):
         '''
         Returns uuid for path specified
-
-        @param path relative path for folder [unicode]
-
+        @param path relative path for folder [str]
+        @param timeout events db lock timeout (seconds) [float]
         @return folder_uuid[str]
 
         '''
@@ -929,6 +940,28 @@ class Sync(QObject):
             return None
 
         return uuid
+
+    def make_offline(self, uuid, is_offline=True, timeout=2.0):
+        '''
+        Makes file or folder with uuid offline as is_offline flag
+        @param uuid file or folder uuid [str]
+        @param is_offline flag [bool]
+        @param timeout events db lock timeout (seconds) [float]
+        @return success [bool]
+        '''
+        try:
+            with self._db.soft_lock(timeout_sec=timeout):
+                self._db.make_offline(
+                    uuid, is_offline=is_offline, read_only=False)
+                if not is_offline and self._event_queue:
+                    self._event_queue.cancel_downloads_for_parent_uuid(uuid)
+                self._recalculate_processing_events_count()
+                self.file_status_refresh.emit()
+                success = True
+        except EventsDbBusy:
+            logger.debug("Make offline events db busy")
+            success = False
+        return success
 
     def get_file_abs_path_by_event_uuid(self, uuid, set_quiet=False):
         try:
@@ -945,17 +978,52 @@ class Sync(QObject):
 
         return path
 
-    def is_path_shared(self, path):
+    def get_offline_status(self, paths, timeout=0.05, timeout_status=2):
+        status = 2  # no smart sync
+        if not self._cfg.smart_sync:
+            return status
+
+        try:
+            with self._db.soft_lock(timeout_sec=timeout):
+                statuses = self._db.get_offline_statuses(paths)
+                if all(statuses):
+                    status = 1      # offline
+                elif all(not s for s in statuses):
+                    status = 0      # not offline
+        except (EventsDbBusy, FileNotFound, AssertionError) as e:
+            logger.warning("Get offline status exception (%s)", e)
+            status = timeout_status
+        return status
+
+    def has_online(self, timeout=0.5):
+        result = False  
+        if not self._cfg.smart_sync:
+            return result
+
+        try:
+            with self._db.soft_lock(timeout_sec=timeout):
+                result = self._db.has_online()
+        except (EventsDbBusy, FileNotFound, AssertionError) as e:
+            logger.warning("Get offline status exception (%s)", e)
+        return result
+
+    def get_offline_dirs(self):
+        try:
+            with self._db.soft_lock():
+                offline_dirs = self._db.get_offline_dirs()
+                self.offline_dirs.emit(offline_dirs)
+        except EventsDbBusy:
+            logger.warning("Get offline status events db busy")
+            QTimer.singleShot(1000, self.get_offline_dirs)
+
+    def is_path_shared(self, path, is_file):
         sharing_info = self._ss_client.get_sharing_info()
-        abs_path = PathConverter(self._root).create_abspath(path)
         try:
             # Given path is a file inside sync directory
-            if os.path.isfile(abs_path):
+            if is_file:
                 uuid = self.get_file_uuid(path, timeout=0.5)
-            elif os.path.isdir(abs_path):
-                uuid = self.get_folder_uuid(path, timeout=0.5)
             else:
-                uuid = None
+                uuid = self.get_folder_uuid(path, timeout=0.5)
         except Exception:
             uuid = None
 
@@ -1278,6 +1346,16 @@ class Sync(QObject):
                     break
             return excluded_is_changed
 
+    def smart_sync_changed(self):
+        logger.debug("Smart sync changed to %s", self._cfg.smart_sync)
+        started = self._started
+        if started:
+            self.pause()
+        if not self._cfg.smart_sync:
+            self._db.make_offline(None, is_offline=True)
+        if started:
+            self.start()
+
     def process_offline_changes(self, status, substatus, l, r):
         logger.debug("process_offline_changes")
         if self.fs and status == STATUS_WAIT:
@@ -1308,7 +1386,6 @@ class Sync(QObject):
         except Exception as e:
             logger.error("Error reverting files: %s", e)
             self.revert_failed.emit(hanged_files + hanged_patches)
-
 
     @qt_run
     def _on_no_disk_space(self, task_or_event, display_name,
@@ -1650,7 +1727,22 @@ class Sync(QObject):
             self.fs.clear_excluded_dirs()
 
     def _delete_on_license_downgrade(self):
+        if not self.fs:
+            # wait for fs
+            QTimer.singleShot(1000, self._delete_on_license_downgrade)
+            return
+
         self._db.delete_remote_events_not_applied()
+        with self._db.create_session(read_only=False) as session:
+            files = self._db.get_files_with_offline_status(
+                is_offline=0, session=session)
+            for file in files:
+                logger.debug("License downgrade, file path %s", file.path)
+                self.fs.accept_delete(
+                    file.path, is_directory=False, is_offline=False)
+                list(map(session.delete, file.events))
+                session.delete(file)
+
 
     def _on_info_tx(self, info_tx):
         self.signal_info_tx.emit(info_tx)
@@ -1705,3 +1797,8 @@ class Sync(QObject):
         except Exception as e:
             logger.error("Unexpected error getting path by uuid (%s)", e)
             return None, None, None
+
+    def _migrate_from_selective_to_smart_sync(self):
+        self._db.migrate_from_excluded_to_online()
+        self._clear_excluded()
+

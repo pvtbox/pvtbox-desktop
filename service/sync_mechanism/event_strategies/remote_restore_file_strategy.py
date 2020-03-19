@@ -30,11 +30,12 @@ logger.addHandler(logging.NullHandler())
 
 
 class RemoteRestoreFileStrategy(RemoteCreateFileStrategy):
-    def __init__(self, db, event, get_download_backups_mode):
+    def __init__(self, db, event, get_download_backups_mode, is_smart_sync):
         super(RemoteRestoreFileStrategy, self).__init__(
             db=db,
             event=event,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     ''' Overloaded methods ====================================================
     '''

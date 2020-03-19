@@ -21,7 +21,7 @@
 ###############################################################################
 from service.monitor.actions.action_base import ActionBase
 from common.signal import Signal
-from common.constants import MODIFY
+from common.constants import MODIFY, FILE_LINK_SUFFIX
 
 
 class NotifyIfModifiedAction(ActionBase):
@@ -34,6 +34,9 @@ class NotifyIfModifiedAction(ActionBase):
 
     def add_new_event(self, fs_event):
         if fs_event.event_type == MODIFY:
+            src_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] \
+                if fs_event.is_link \
+                else fs_event.src
             self.file_modified.emit(
-                self._patch_converter.create_relpath(fs_event.src),
+                self._patch_converter.create_relpath(src_path),
                 fs_event.mtime)

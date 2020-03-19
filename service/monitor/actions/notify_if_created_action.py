@@ -23,7 +23,7 @@ from time import time
 
 from service.monitor.actions.action_base import ActionBase
 from common.signal import Signal
-from common.constants import CREATE
+from common.constants import CREATE, FILE_LINK_SUFFIX
 
 
 class NotifyIfCreatedAction(ActionBase):
@@ -37,7 +37,10 @@ class NotifyIfCreatedAction(ActionBase):
 
     def add_new_event(self, fs_event):
         if fs_event.event_type == CREATE and not fs_event.is_dir:
+            src_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] \
+                if fs_event.src.endswith(FILE_LINK_SUFFIX) \
+                else fs_event.src
             self.file_added.emit(
-                self._patch_converter.create_relpath(fs_event.src),
+                self._patch_converter.create_relpath(src_path),
                 fs_event.is_dir,
                 time())

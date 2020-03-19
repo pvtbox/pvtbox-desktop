@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>577</width>
-    <height>426</height>
+    <height>448</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -85,7 +85,7 @@ QTabBar::tab:hover:selected {color: #ff9144; background-color: #ffffff  }
 </string>
         </property>
         <property name="currentIndex">
-         <number>1</number>
+         <number>0</number>
         </property>
         <widget class="QWidget" name="tab_general">
          <property name="styleSheet">
@@ -397,7 +397,7 @@ QComboBox:!enabled {border: 1px solid #aaaaaa; }</string>
            </spacer>
           </item>
           <item>
-           <widget class="QLabel" name="selective_sync_label">
+           <widget class="QCheckBox" name="is_smart_sync_checkBox">
             <property name="font">
              <font>
               <pointsize>9</pointsize>
@@ -406,12 +406,12 @@ QComboBox:!enabled {border: 1px solid #aaaaaa; }</string>
              </font>
             </property>
             <property name="text">
-             <string>Selective sync</string>
+             <string>SmartSync+</string>
             </property>
            </widget>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="selective_sync_layout">
+           <layout class="QHBoxLayout" name="smart_sync_layout">
             <property name="spacing">
              <number>6</number>
             </property>
@@ -441,7 +441,7 @@ QComboBox:!enabled {border: 1px solid #aaaaaa; }</string>
              </spacer>
             </item>
             <item>
-             <widget class="QPushButton" name="selective_sync_button">
+             <widget class="QPushButton" name="smart_sync_button">
               <property name="font">
                <font>
                 <pointsize>9</pointsize>

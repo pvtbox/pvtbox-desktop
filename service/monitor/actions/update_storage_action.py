@@ -24,7 +24,7 @@ from os import path, stat
 from time import time
 
 from service.events_db import FolderNotFound
-from common.constants import CREATE, MODIFY, MOVE
+from common.constants import CREATE, MODIFY, MOVE, FILE_LINK_SUFFIX
 from common.file_path import FilePath
 from service.monitor.actions.action_base import ActionBase
 from common.errors import ExpectedError, EventConflicted, EventAlreadyAdded
@@ -55,11 +55,13 @@ class UpdateStorageAction(ActionBase):
         if self._waiting:
             return self.event_returned(fs_event)
 
+        src_path = fs_event.src[: -len(FILE_LINK_SUFFIX)] if fs_event.is_link \
+            else fs_event.src
         with self._storage.create_session(read_only=False,
                                           locked=True) as session:
             try:
                 file = self._storage.get_known_file(
-                    fs_event.src, session=session)
+                    src_path, session=session)
                 if file != fs_event.file or \
                         not self._process(fs_event, file, session):
                     return self.event_returned(fs_event)
@@ -114,9 +116,11 @@ class UpdateStorageAction(ActionBase):
         if fs_event.event_type in (CREATE, MODIFY, MOVE):
             if fs_event.event_type in (CREATE, MODIFY):
                 if fs_event.event_type in (CREATE, ):
+                    abs_path = fs_event.src if not fs_event.is_link \
+                        else fs_event.src[: -len(FILE_LINK_SUFFIX)]
                     fs_event.file = (
                         self._storage.get_new_file(
-                            abs_path=fs_event.src,
+                            abs_path=abs_path,
                             is_folder=fs_event.is_dir,
                             session=session))
                     if not fs_event.is_dir:

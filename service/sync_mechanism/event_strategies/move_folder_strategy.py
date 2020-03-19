@@ -38,13 +38,14 @@ class LocalMoveFolderStrategy(BaseLocalMoveStrategy, LocalEventStrategy):
     """
 
     def __init__(self, db, event, file_path, new_file_path,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         assert not event.diff_file_size
         super(LocalMoveFolderStrategy, self).__init__(
             db=db,
             event=event,
             file_path=file_path,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
         # new_file_path is None if event already saved to db with new path
         if new_file_path:
             event.file_name = basename(new_file_path)
@@ -98,12 +99,13 @@ class RemoteMoveFolderStrategy(BaseRemoteMoveStrategy, RemoteEventStrategy):
     """
 
     def __init__(self, db, event, last_server_event_id,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         super(RemoteMoveFolderStrategy, self).__init__(
             db=db,
             event=event,
             last_server_event_id=last_server_event_id,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     def set_collaborated_folder_icon(self, session, fs, collaborated_folders):
         folder = self.event.file

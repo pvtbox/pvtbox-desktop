@@ -17,6 +17,4 @@
 #   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #   
 ###############################################################################
-from .selective_sync_dialog import SelectiveSyncDialog
-
-__all__ = ['SelectiveSyncDialog', ]
+LOGGING_ENABLED = True

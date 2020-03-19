@@ -41,7 +41,7 @@ from common.utils \
 import settings
 from .utils import msgbox
 from common.translator import tr
-from application.selective_sync_dialog import SelectiveSyncDialog
+from application.smart_sync_dialog import SmartSyncDialog
 from common.signal import Signal
 from common.file_path import FilePath
 from common.errors import ExpectedError
@@ -61,7 +61,9 @@ class Settings(object):
         pass
 
     def __init__(self, cfg, main_cfg, start_service, exit_service,
-                 parent=None, size=None, migrate=False, dp=1):
+                 parent=None, size=None, migrate=False, dp=1,
+                 get_offline_dirs=lambda: None,
+                 set_offline_dirs=lambda o, no: None):
         super(Settings, self).__init__()
         self._cfg = cfg
         self._main_cfg = main_cfg
@@ -70,6 +72,9 @@ class Settings(object):
         self._parent = parent
         self._size = size
         self._dp = dp
+        self._get_offline_dirs = get_offline_dirs
+        self._set_offline_dirs = set_offline_dirs
+
         self._dialog = QDialog(parent)
         self._dialog.setWindowIcon(QIcon(':/images/icon.png'))
         self._dialog.setAttribute(Qt.WA_MacFrameworkScaled)
@@ -111,9 +116,7 @@ class Settings(object):
         self._set_fonts()
         self._ui.tabWidget.setCurrentIndex(0)
 
-        # Selective sync dialog results
-        self._excluded_dirs = None
-        self._existing_excluded_dirs = self._cfg.get_setting('excluded_dirs')
+        self._smart_sync_dialog = None
 
         self.logged_out = Signal(bool)
         self.logging_disabled_changed = Signal(bool)
@@ -144,8 +147,8 @@ class Settings(object):
         ui.buttonBox.accepted.connect(self._dialog.accept)
         ui.buttonBox.rejected.connect(self._dialog.reject)
 
-        ui.selective_sync_button.clicked.connect(
-            self._on_selective_sync_button_clicked)
+        ui.smart_sync_button.clicked.connect(
+            self._on_smart_sync_button_clicked)
 
         ui.location_button.clicked.connect(
             self._on_sync_folder_location_button_clicked)
@@ -156,11 +159,11 @@ class Settings(object):
         ui.location_button.leaveEvent = lambda _: \
             ui.location_button.setIcon(QIcon(
                 ':/images/settings/pencil.svg'))
-        ui.selective_sync_button.enterEvent = lambda _: \
-            ui.selective_sync_button.setIcon(QIcon(
+        ui.smart_sync_button.enterEvent = lambda _: \
+            ui.smart_sync_button.setIcon(QIcon(
                 ':/images/settings/folder_sync_hovered.svg'))
-        ui.selective_sync_button.leaveEvent = lambda _: \
-            ui.selective_sync_button.setIcon(QIcon(
+        ui.smart_sync_button.leaveEvent = lambda _: \
+            ui.smart_sync_button.setIcon(QIcon(
                 ':/images/settings/folder_sync.svg'))
         ui.logout_button.enterEvent = lambda _: \
             ui.logout_button.setIcon(QIcon(
@@ -266,7 +269,6 @@ class Settings(object):
                   manual_btn=ui.upload_limit_radioButton,
                   edit=ui.upload_limit_edit)
 
-        self._excluded_dirs = cfg.get_setting('excluded_dirs', None)
         ui.autologin_checkbox.setChecked(self._main_cfg.autologin)
         ui.autologin_checkbox.setEnabled(not portable)
         if portable:
@@ -274,13 +276,16 @@ class Settings(object):
         ui.tracking_checkbox.setChecked(cfg.send_statistics)
         ui.autoupdate_checkbox.setChecked(self._main_cfg.autoupdate)
         ui.download_backups_checkBox.setChecked(cfg.download_backups)
+        ui.is_smart_sync_checkBox.setChecked(cfg.smart_sync)
         ui.disable_logging_checkBox.setChecked(self._main_cfg.logging_disabled)
 
-        # Disable selective sync for free license
+        # Disable smart sync for free license
         if not cfg.license_type or cfg.license_type == FREE_LICENSE:
-            ui.selective_sync_label.setText(
-                tr("Selective sync is not available for your license"))
-            ui.selective_sync_button.setEnabled(False)
+            ui.is_smart_sync_checkBox.setText(
+                tr("SmartSync+ is not available for your license"))
+            ui.is_smart_sync_checkBox.setChecked(False)
+            ui.is_smart_sync_checkBox.setCheckable(False)
+            ui.smart_sync_button.setEnabled(False)
 
         ui.startup_checkbox.setChecked(is_in_system_startup())
         ui.startup_checkbox.setEnabled(not portable)
@@ -305,10 +310,7 @@ class Settings(object):
     def _config_is_changed(self):
         service_settings, main_settings = self._get_configs_from_ui()
         for param, value in service_settings.items():
-            if param == 'excluded_dirs' and \
-                self._existing_excluded_dirs != value:
-                return True
-            elif self._cfg.get_setting(param) != value:
+            if self._cfg.get_setting(param) != value:
                 return True
         for param, value in main_settings.items():
             if self._main_cfg.get_setting(param) != value:
@@ -331,9 +333,9 @@ class Settings(object):
                 0 if ui.download_auto_radioButton.isChecked()
                 or not ui.download_limit_edit.text()
                 else int(ui.download_limit_edit.text())),
-            'excluded_dirs': self._excluded_dirs,
             'send_statistics': bool(ui.tracking_checkbox.isChecked()),
             'download_backups': bool(ui.download_backups_checkBox.isChecked()),
+            'smart_sync': bool(ui.is_smart_sync_checkBox.isChecked()),
             'autologin': bool(ui.autologin_checkbox.isChecked()),
         }, {
             'autologin': bool(ui.autologin_checkbox.isChecked()),
@@ -342,21 +344,27 @@ class Settings(object):
             'download_backups': bool(ui.download_backups_checkBox.isChecked()),
         }
 
-    def _on_selective_sync_button_clicked(self):
+    def _on_smart_sync_button_clicked(self):
+        self._get_offline_dirs()
+        root = str(self._ui.location_edit.text())
+        self._smart_sync_dialog = SmartSyncDialog(self._dialog)
+        offline, online = self._smart_sync_dialog.show(
+            root_path=root,
+            hide_dotted=True)
+        if offline or online:
+            logger.info(
+                "Directories set to be offline: (%s)",
+                ", ".join(map(lambda s: u"'%s'" % s, offline)))
+            self._set_offline_dirs(offline, online)
+
+    def offline_dirs(self, offline_dirs):
         root = str(self._ui.location_edit.text())
         pc = PathConverter(root)
-        excluded_dirs_abs_paths = list(map(
-            lambda p: pc.create_abspath(p), self._excluded_dirs))
-        result = SelectiveSyncDialog(self._dialog).show(
-            root_path=root,
-            hide_dotted=True,
-            excluded_dirs=excluded_dirs_abs_paths)
-        if result is not None:
-            self._excluded_dirs = list(map(
-                lambda p: pc.create_relpath(p), result))
-            logger.info(
-                "Directories set to be excluded from sync: (%s)",
-                ", ".join(map(lambda s: u"'%s'" % s, self._excluded_dirs)))
+        offline_dirs_abs_paths = set(map(
+            lambda p: pc.create_abspath(p), offline_dirs))
+        if self._smart_sync_dialog:
+            self._smart_sync_dialog.set_offline_paths(
+                offline_dirs_abs_paths)
 
     def _on_sync_folder_location_button_clicked(self):
         selected_folder = QFileDialog.getExistingDirectory(

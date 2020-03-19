@@ -29,7 +29,8 @@ from watchdog.observers import Observer
 
 from common.file_path import FilePath
 from common.utils import get_files_dir_list
-from common.constants import DELETE, CREATE, MODIFY, event_names
+from common.constants import DELETE, CREATE, MODIFY, event_names, \
+    FILE_LINK_SUFFIX
 from service.monitor.fs_event import FsEvent
 from common.signal import Signal
 
@@ -141,7 +142,7 @@ class ObserverWrapper(QObject):
             self._observer.unschedule_all()
             self._observer.stop()
             self._observer.join()
-        except TypeError as e:
+        except Exception as e:
             logger.error('Exception while stopping fs observer: %s', e)
         self._observer = None
 
@@ -221,6 +222,15 @@ class ObserverWrapper(QObject):
         files_deleted = known_files.difference(actual_files)
         if not self._active or not self._started:
             return
+
+        for path in files_deleted.copy():
+            if not self._active or not self._started:
+                return
+
+            path_plus_suffix = path + FILE_LINK_SUFFIX
+            if path_plus_suffix in files_created:
+                files_deleted.discard(path)
+                files_created.discard(path_plus_suffix)
 
         logger.debug("Obtaining known folders from storage...")
         known_folders = set(self._storage.get_known_folders())

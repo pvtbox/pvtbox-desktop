@@ -41,9 +41,10 @@ from common.signal import Signal
 from common.utils \
     import remove_dir, remove_file, get_patches_dir, \
     get_copies_dir, get_signatures_dir, \
-    set_custom_folder_icon, reset_custom_folder_icon, benchmark
+    set_custom_folder_icon, reset_custom_folder_icon, benchmark, \
+    delete_file_links
 from common.constants import HIDDEN_FILES, HIDDEN_DIRS, MAX_FILE_NAME_LEN
-from common.constants import CREATE, MOVE, MODIFY, DELETE
+from common.constants import CREATE, MOVE, MODIFY, DELETE, FILE_LINK_SUFFIX
 
 from .local_processor import LocalProcessor
 from common.path_converter import PathConverter
@@ -201,6 +202,8 @@ class FilesystemMonitor(QObject):
         self.copy_added = Signal(str)
         self._actions.copy_added.connect(self.copy_added)
 
+        self._actions.rename_file.connect(self._rename_file)
+
         self.special_file_event = Signal(str,   # path
                                          int,       # event type
                                          str)   # new path
@@ -298,6 +301,8 @@ class FilesystemMonitor(QObject):
             self._path_converter.create_abspath(file_path))
 
     def is_known(self, file_path):
+        if file_path.endswith(FILE_LINK_SUFFIX):
+            file_path = file_path[: -len(FILE_LINK_SUFFIX)]
         return self._storage.get_known_file(file_path) is not None
 
     def process_offline_changes(self):
@@ -311,6 +316,7 @@ class FilesystemMonitor(QObject):
 
     def clean_storage(self):
         self._storage.clean()
+        delete_file_links(self._root)
 
     def clean_copies(self, with_files=True):
         self._copies_storage.clean(with_files=with_files)
@@ -361,7 +367,8 @@ class FilesystemMonitor(QObject):
         logger.info("Removed all files and folders")
         self._storage.clean()
 
-    def accept_delete(self, path, is_directory=False, events_file_id=None):
+    def accept_delete(self, path, is_directory=False, events_file_id=None,
+                      is_offline=True):
         '''
         Processes file deletion
 
@@ -375,7 +382,8 @@ class FilesystemMonitor(QObject):
         if is_directory:
             self._quiet_processor.delete_directory(full_path, events_file_id)
         else:
-            self._quiet_processor.delete_file(full_path, events_file_id)
+            self._quiet_processor.delete_file(full_path, events_file_id,
+                                              is_offline)
         self.file_removed_from_indexing.emit(FilePath(full_path), True)
 
         logger.info("'%s' %s is deleted", path, object_type)
@@ -415,7 +423,8 @@ class FilesystemMonitor(QObject):
                 DELETE, op.dirname(full_fn), True, is_offline=True, quiet=True))
             raise
 
-    def accept_move(self, src, dst, is_directory=False, events_file_id=None):
+    def accept_move(self, src, dst, is_directory=False, events_file_id=None,
+                    is_offline=True):
         src_full_path = self._path_converter.create_abspath(src)
         dst_full_path = self._path_converter.create_abspath(dst)
 
@@ -434,7 +443,8 @@ class FilesystemMonitor(QObject):
                     src_full_path, dst_full_path, events_file_id,
                     self.Exceptions.FileAlreadyExists,
                     self.Exceptions.FileNotFound,
-                    wrong_file_id=self.Exceptions.WrongFileId)
+                    wrong_file_id=self.Exceptions.WrongFileId,
+                    is_offline=is_offline)
             logger.info(
                 "'%s' %s is moved to '%s'", src, object_type, dst)
             self.file_removed_from_indexing.emit(FilePath(src_full_path), True)
@@ -589,22 +599,28 @@ class FilesystemMonitor(QObject):
                     conflict_file_name, orig_filename, is_folder, name_suffix, with_time)
         return conflict_file_name
 
-    def move_file(self, src, dst):
+    def move_file(self, src, dst, is_offline=True):
         src_full_path = self._path_converter.create_abspath(src)
         dst_full_path = self._path_converter.create_abspath(dst)
+        is_offline = True if op.isdir(src_full_path) else is_offline
+        src_hard_path = self._quiet_processor.get_hard_path(
+            src_full_path, is_offline)
+        dst_hard_path = self._quiet_processor.get_hard_path(
+            dst_full_path, is_offline)
 
-        if not op.exists(src_full_path):
+        if not op.exists(src_hard_path):
             raise self.Exceptions.FileNotFound(src_full_path)
-        elif op.exists(dst_full_path):
+        elif op.exists(dst_hard_path):
             raise self.Exceptions.FileAlreadyExists(dst_full_path)
 
         dst_parent_folder_path = op.dirname(dst_full_path)
         if not op.exists(dst_parent_folder_path):
             self._on_event_arrived(FsEvent(
-                DELETE, dst_parent_folder_path, True, is_offline=True, quiet=True))
+                DELETE, dst_parent_folder_path, True,
+                is_offline=True, quiet=True))
 
         try:
-            os.rename(src_full_path, dst_full_path)
+            os.rename(src_hard_path, dst_hard_path)
         except OSError as e:
             logger.warning("Can't move file (dir) %s. Reason: %s",
                            src_full_path, e)
@@ -614,17 +630,22 @@ class FilesystemMonitor(QObject):
             else:
                 raise e
 
-    def copy_file(self, src, dst, is_directory=False):
+    def copy_file(self, src, dst, is_directory=False, is_offline=True):
+        is_offline = True if is_directory else is_offline
         src_full_path = self._path_converter.create_abspath(src)
         dst_full_path = self._path_converter.create_abspath(dst)
+        src_hard_path = self._quiet_processor.get_hard_path(
+            src_full_path, is_offline)
+        dst_hard_path = self._quiet_processor.get_hard_path(
+            dst_full_path, is_offline)
 
-        if not op.exists(src_full_path):
+        if not op.exists(src_hard_path):
             raise self.Exceptions.FileNotFound(src_full_path)
 
         if is_directory:
             shutil.copytree(src_full_path, dst_full_path)
         else:
-            common.utils.copy_file(src_full_path, dst_full_path)
+            common.utils.copy_file(src_hard_path, dst_hard_path)
 
     def restore_file_from_copy(self, file_name, copy_hash, events_file_id,
                                search_by_id=False):
@@ -654,13 +675,14 @@ class FilesystemMonitor(QObject):
         self._quiet_processor.make_copy_from_existing_files(copy_hash)
 
     def create_empty_file(self, file_name, file_hash, events_file_id,
-                          search_by_id=False):
+                          search_by_id=False, is_offline=True):
         try:
             self._quiet_processor.create_empty_file(
                 file_name, file_hash, silent=True,
                 events_file_id=events_file_id,
                 search_by_id=search_by_id,
-                wrong_file_id=self.Exceptions.WrongFileId)
+                wrong_file_id=self.Exceptions.WrongFileId,
+                is_offline=is_offline)
         except AssertionError:
             self._on_event_arrived(FsEvent(
                 DELETE, op.dirname(
@@ -692,9 +714,11 @@ class FilesystemMonitor(QObject):
         self._quiet_processor.delete_old_signatures(
             get_signatures_dir(self._root), delete_all)
 
-    def path_exists(self, path):
+    def path_exists(self, path, is_offline=True):
         full_path = self._path_converter.create_abspath(path)
-        return op.exists(full_path)
+        hard_path = self._quiet_processor.get_hard_path(
+            full_path, is_offline)
+        return op.exists(hard_path)
 
     def rename_excluded(self, rel_path):
         logger.debug("Renaming excluded dir %s", rel_path)
@@ -702,6 +726,15 @@ class FilesystemMonitor(QObject):
             rel_path,
             name_suffix=self.selective_sync_conflict_suffix,
             with_time=False)
+        self.move_file(rel_path, new_path)
+
+    def _rename_file(self, abs_path):
+        rel_path = self._path_converter.create_relpath(abs_path)
+        new_path = self.generate_conflict_file_name(
+            rel_path,
+            is_folder=False,
+            name_suffix="",
+            with_time=True)
         self.move_file(rel_path, new_path)
 
     def db_file_exists(self):

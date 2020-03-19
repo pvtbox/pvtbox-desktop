@@ -17,4 +17,6 @@
 #   along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #   
 ###############################################################################
-LOGGING_ENABLED = False
+from .smart_sync_dialog import SmartSyncDialog
+
+__all__ = ['SmartSyncDialog', ]

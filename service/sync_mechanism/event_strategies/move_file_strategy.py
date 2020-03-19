@@ -43,8 +43,10 @@ class BaseLocalMoveStrategy(object):
         new_path = ('/'.join([folder.path, event.file_name])
                     if folder
                     else event.file_name)
-        fs.accept_move(event.file.path, new_path, is_directory=event.is_folder,
-                       events_file_id=self.event.file_id)
+        fs.accept_move(event.file.path, new_path,
+                       is_directory=event.is_folder,
+                       events_file_id=self.event.file_id,
+                       is_offline=self.event.file.is_offline)
 
     def get_dst_path(self):
         return self._new_path
@@ -56,13 +58,14 @@ class LocalMoveFileStrategy(BaseLocalMoveStrategy, LocalEventStrategy):
     """
 
     def __init__(self, db, event, file_path, new_file_path,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         assert not event.diff_file_size
         super(LocalMoveFileStrategy, self).__init__(
             db=db,
             event=event,
             file_path=file_path,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
         # new_file_path is None if event already saved to db with new path
         if new_file_path:
             event.file_name = basename(new_file_path)
@@ -116,12 +119,14 @@ class RemoteMoveFileStrategy(BaseRemoteMoveStrategy, RemoteEventStrategy):
     """
 
     def __init__(self, db, event, last_server_event_id, copies_storage=None,
-                 get_download_backups_mode=lambda: None):
+                 get_download_backups_mode=lambda: None,
+                 is_smart_sync=False):
         super(RemoteMoveFileStrategy, self).__init__(
             db=db,
             event=event,
             last_server_event_id=last_server_event_id,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync = is_smart_sync)
         self._copies_storage = copies_storage
 
     def is_file_download(self):

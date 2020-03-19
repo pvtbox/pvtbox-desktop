@@ -60,13 +60,14 @@ class CreateFolderStrategy(object):
 
 class LocalCreateFolderStrategy(CreateFolderStrategy, LocalCreateFileStrategy):
     def __init__(self, db, event, folder_path, license_type,
-                 get_download_backups_mode):
+                 get_download_backups_mode, is_smart_sync=False):
         super(LocalCreateFolderStrategy, self).__init__(
             db=db,
             event=event,
             file_path=folder_path,
             license_type=license_type,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     ''' Functions to overload in descendants ==================================
     '''
@@ -184,11 +185,12 @@ class LocalCreateFolderStrategy(CreateFolderStrategy, LocalCreateFileStrategy):
 
 class RemoteCreateFolderStrategy(CreateFolderStrategy,
                                  RemoteCreateFileStrategy):
-    def __init__(self, db, event, get_download_backups_mode):
+    def __init__(self, db, event, get_download_backups_mode, is_smart_sync):
         super(RemoteCreateFolderStrategy, self).__init__(
             db=db,
             event=event,
-            get_download_backups_mode=get_download_backups_mode)
+            get_download_backups_mode=get_download_backups_mode,
+            is_smart_sync=is_smart_sync)
 
     ''' Overloaded methods ====================================================
     '''

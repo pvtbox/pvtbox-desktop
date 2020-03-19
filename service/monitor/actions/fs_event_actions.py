@@ -223,6 +223,7 @@ class FsEventActions(QObject):
         self.no_disk_space = self._make_file_recent_copy.no_disk_space
         self.copy_added = self._move_file_recent_copy.copy_added
         self.set_waiting = self._update_storage.set_waiting
+        self.rename_file = self._load_info_from_storage.rename_file
 
     def _disconnect_signals_and_slots(self):
         for action in self._actions:
@@ -246,7 +247,7 @@ class FsEventActions(QObject):
 
     def _connect_load_info_from_storage_signals(self):
         self._load_info_from_storage.event_suppressed.connect(
-            self._error_happens)
+            self._event_suppressed)
         self._load_info_from_storage.event_returned.connect(
             self._event_returned)
         self._load_info_from_storage.event_passed.connect(

@@ -27,7 +27,8 @@ from common.utils import get_platform, HOME_DIR, ensure_unicode, make_dirs, get_
 from .protocol import \
     parse_message, get_sync_dir_reply, emit_signal, create_command, \
     get_is_sharing_reply, get_shared_reply, get_files_status_reply, \
-    get_clear_path_reply, get_share_copy_move_reply, get_file_info_reply
+    get_clear_path_reply, get_share_copy_move_reply, get_file_info_reply, \
+    get_offline_status_reply, get_smart_sync_reply
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -78,6 +79,15 @@ class IPCWebSocketProtocol(WebSocketServerProtocol):
         elif cmd in('file_info', ):
             emit_signal(cmd, [path], context)
             return
+        elif cmd in ('offline_off', 'offline_on'):
+            is_offline = cmd == 'offline_on'
+            emit_signal('offline_paths', paths, is_offline)
+            self.sendMessage(create_command(cmd).encode())
+            return
+        elif cmd == 'offline_status':
+            self.sendMessage(get_offline_status_reply(
+                paths if paths else [path]).encode())
+            return
 
         # Process other commands
         try:
@@ -104,6 +114,8 @@ class IPCWebSocketProtocol(WebSocketServerProtocol):
         shared_reply = get_shared_reply()
         if shared_reply is not None:
             self.sendMessage(shared_reply.encode())
+
+        self.sendMessage(get_smart_sync_reply().encode())
 
 
 class IPCWebSocketServer(object):
@@ -136,6 +148,9 @@ class IPCWebSocketServer(object):
     def on_paths_links(self, paths, links, context, move=False):
         self._loop.call_soon_threadsafe(
             self._broadcast_paths_links, paths, links, context, move)
+
+    def on_smart_sync_changed(self):
+        self._broadcast_smart_sync()
 
     def _broadcast_sync_dir(self):
         if not self._factory or not self._server:
@@ -183,6 +198,12 @@ class IPCWebSocketServer(object):
         msg = get_share_copy_move_reply(paths, links, context, move).encode()
         for client in clients:
              client.sendMessage(msg)
+
+    def _broadcast_smart_sync(self):
+        clients = getattr(self._factory, 'client_connections', set())
+        msg = get_smart_sync_reply().encode()
+        for client in clients:
+            client.sendMessage(msg)
 
     @run_daemon
     def start(self):

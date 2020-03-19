@@ -21,12 +21,12 @@
 import logging
 import os.path as op
 
-from PySide2 import QtCore, QtWidgets
+from PySide2 import QtCore
+from PySide2.QtGui import QIcon
 
 from .dir_tree_item import DirTreeItem
 from .params import LOGGING_ENABLED
 from common.file_path import FilePath
-from common.path_utils import is_contained_in_dirs
 
 
 # Setup logging
@@ -36,10 +36,10 @@ logger.addHandler(logging.NullHandler())
 
 class TreeModel(QtCore.QAbstractItemModel):
     """
-    Model class for selective sync directory view
+    Model class for smart sync directory view
     """
 
-    def __init__(self, root_path, excluded_dirs=(), hide_dotted=False):
+    def __init__(self, root_path, hide_dotted=False):
         """
         Constructor
 
@@ -53,13 +53,18 @@ class TreeModel(QtCore.QAbstractItemModel):
         super(TreeModel, self).__init__()
         self._column_count = 1
         self._checking_column = 0
-        self._excluded_dirs = excluded_dirs
+        self._offline_dirs = None
+        self._added_to_offline = set()
+        self._removed_from_offline = set()
         self._hide_dotted = hide_dotted
+        self._root_path = root_path
         self._root_item = DirTreeItem(
-            None, None, parent_item=None, checked=True, tree_model=self)
-        self._add_root_path_item(FilePath(root_path).longpath)
+            None, None, parent_item=None, checked=False, tree_model=self)
+        self._changed_items = set()
+        self._add_root_path_item(FilePath(self._root_path).longpath)
 
-        self._icon_provider = QtWidgets.QFileIconProvider()
+    def set_offline_dirs(self, offline_dirs):
+        self._offline_dirs = offline_dirs
 
     def hide_dotted(self):
         return self._hide_dotted
@@ -78,14 +83,14 @@ class TreeModel(QtCore.QAbstractItemModel):
 
         self._root_path_item = DirTreeItem(
             directory_path, dirname=op.basename(directory_path),
-            parent_item=self._root_item, checked=True, is_root=True)
+            parent_item=self._root_item, checked=False, is_root=True)
         self._root_item.append_child_item(self._root_path_item)
 
     def get_root_path_index(self):
         return self._get_tree_item_index(self._root_path_item)
 
-    def is_path_excluded(self, path):
-        return path in self._excluded_dirs
+    def is_path_offline(self, path):
+        return self._offline_dirs and path in self._offline_dirs
 
     def rowCount(self, parent_index):
         if not parent_index.isValid():
@@ -150,8 +155,13 @@ class TreeModel(QtCore.QAbstractItemModel):
             return int(value)
         elif role == QtCore.Qt.DecorationRole and \
                 index.column() == self._checking_column:
-            return self._icon_provider.icon(
-                QtWidgets.QFileIconProvider.Folder)
+            if item.is_offline() and \
+                    not item.will_be_online():
+                return QIcon(":/images/status_synced.svg")
+            elif item.will_be_offline():
+                return QIcon(":/images/status_syncing.svg")
+            else:
+                return QIcon(":/images/status_online.svg")
 
     def setData(self, index, value, role=QtCore.Qt.EditRole):
         if index.column() == self._checking_column:
@@ -159,7 +169,9 @@ class TreeModel(QtCore.QAbstractItemModel):
                 return False
             if role == QtCore.Qt.CheckStateRole:
                 item = index.internalPointer()
+                self._item_offline_changed(item, value)
                 item.set_checked(value)
+
                 return True
 
         return super(TreeModel, self).setData(index, value, role)
@@ -174,7 +186,7 @@ class TreeModel(QtCore.QAbstractItemModel):
                 "Requested flags for item '%s'", item)
 
         if index.column() == self._checking_column:
-            flags = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+            flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
             if item != self._root_item:
                 flags = flags | QtCore.Qt.ItemIsUserCheckable
         else:
@@ -220,49 +232,27 @@ class TreeModel(QtCore.QAbstractItemModel):
             if child.can_fetch_more():
                 child.fetch_subdirs()
 
-    def _add_excluded(self):
-        def split_path(path, root):
-            result = []
-            result.append(path)
-            while True:
-                head, tail = op.split(path)
-                if head in ('', '/', root):
-                    break
-                else:
-                    result.append(head)
-                    path = head
-            return reversed(result)
+    def get_added_to_offline_paths(self):
+        return self._added_to_offline
 
-        for ed in self._excluded_dirs:
-            if not ed:
-                continue
-            parent_item = self._root_path_item
-            root_path = self._root_path_item.get_fullpath()
-            for item_path in split_path(ed, root_path):
-                res = parent_item.get_child_by_fullpath(item_path)
-                if not res:
-                    child_item = \
-                        DirTreeItem(item_path, parent_item=parent_item)
-                    parent_item.append_child_item(child_item)
-                    parent_item = child_item
-                else:
-                    parent_item = res
+    def get_removed_from_offline_paths(self):
+        return self._removed_from_offline
 
-    def get_unchecked_paths(self):
-        result = []
-        for item in self._root_path_item.descendants():
-            if item.is_checked() or item.is_tristate():
-                continue
-            fullpath = item.get_fullpath()
-            # assure only topmost folders are in excluded dirs list
-            if not is_contained_in_dirs(fullpath, result):
-                res = result[:]
-                for ed in res:
-                    if is_contained_in_dirs(ed, [fullpath]):
-                        result.remove(ed)
-                result.append(fullpath)
+    def _item_offline_changed(self, item, value):
+        path = item.get_fullpath()
+        if value:
+            item.set_will_be_offline(True)
+            item.set_will_be_online(False)
+            self._added_to_offline.add(path)
+            self._removed_from_offline.discard(path)
+        else:
+            item.set_will_be_online(True)
+            item.set_will_be_offline(False)
+            self._removed_from_offline.add(path)
+            self._added_to_offline.discard(path)
 
-        return result
+        for child in item.get_children():
+            self._item_offline_changed(child, value)
 
     def on_item_expanded(self, index):
         if not index.isValid():
@@ -271,5 +261,3 @@ class TreeModel(QtCore.QAbstractItemModel):
         item = index.internalPointer()
         if item != self._root_path_item:
             return
-
-        self._add_excluded()

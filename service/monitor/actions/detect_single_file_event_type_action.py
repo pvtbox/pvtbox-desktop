@@ -22,7 +22,7 @@
 ###############################################################################
 import os.path as op
 
-from common.constants import CREATE, MODIFY, DELETE, MOVE
+from common.constants import CREATE, MODIFY, DELETE, MOVE, FILE_LINK_SUFFIX
 from service.monitor.actions.action_base import ActionBase
 from common.file_path import FilePath
 
@@ -46,7 +46,8 @@ class DetectSingleFileEventTypeAction(ActionBase):
             else:
                 fs_event.event_type = CREATE
         else:
-            if file_exists_in_storage:
+            if file_exists_in_storage and \
+                    not self._check_pair_file_exists_on_fs(fs_event):
                 fs_event.event_type = DELETE
             else:
                 return self.event_suppressed(fs_event)
@@ -54,3 +55,10 @@ class DetectSingleFileEventTypeAction(ActionBase):
 
     def _check_file_exists_on_fs(self, file):
         return op.exists(FilePath(file).longpath)
+
+    def _check_pair_file_exists_on_fs(self, fs_event):
+        if fs_event.is_link:
+            path2 = fs_event.src[: -len(FILE_LINK_SUFFIX)]
+        else:
+            path2 = fs_event.src + FILE_LINK_SUFFIX
+        return op.exists(FilePath(path2).longpath)

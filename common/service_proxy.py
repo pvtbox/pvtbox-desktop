@@ -65,9 +65,9 @@ class ServiceProxy(MessageProxy):
     def exit_service(self):
         self.send_message("exit_service")
 
-    def gui_logged_in(self, login_data, new_user, download_backups):
+    def gui_logged_in(self, login_data, new_user, download_backups, smart_sync):
         self.send_message("gui_logged_in", [login_data, new_user,
-                                            download_backups])
+                                            download_backups, smart_sync])
 
     def remote_action(self, action):
         self.send_message("remote_action", [action])
@@ -85,3 +85,9 @@ class ServiceProxy(MessageProxy):
 
     def add_to_sync_folder(self, selected_files_or_folders):
         self.send_message("add_to_sync_folder", [selected_files_or_folders])
+
+    def get_offline_dirs(self):
+        self.send_message("get_offline_dirs")
+
+    def set_offline_dirs(self, offline_dirs, online_dirs):
+        self.send_message("set_offline_dirs", [offline_dirs, online_dirs])

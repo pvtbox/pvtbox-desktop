@@ -21,7 +21,8 @@
 import logging
 import time
 
-from common.constants import MOVE, FILE, DIRECTORY, event_names
+from common.constants import MOVE, FILE, DIRECTORY, event_names, \
+    FILE_LINK_SUFFIX
 from common.signal import Signal
 
 
@@ -48,16 +49,18 @@ class LocalProcessor(object):
             time=time.time(),
             type=DIRECTORY if fs_event.is_dir else FILE
         )
+        src = fs_event.src if not fs_event.is_link \
+            else fs_event.src[: -len(FILE_LINK_SUFFIX)]
+        dst = fs_event.dst if not fs_event.is_link or \
+                              fs_event.event_type != MOVE \
+            else fs_event.dst[: -len(FILE_LINK_SUFFIX)]
 
         if fs_event.event_type == MOVE:
-            template_message['src'] = self._path_converter.create_relpath(
-                fs_event.src)
-            template_message['dst'] = self._path_converter.create_relpath(
-                fs_event.dst)
+            template_message['src'] = self._path_converter.create_relpath(src)
+            template_message['dst'] = self._path_converter.create_relpath(dst)
             template_message['hash'] = fs_event.old_hash
         else:
-            template_message['path'] = self._path_converter.create_relpath(
-                fs_event.src)
+            template_message['path'] = self._path_converter.create_relpath(src)
             template_message['hash'] = fs_event.new_hash
             template_message['old_hash'] = fs_event.old_hash
         template_message['file_size'] = fs_event.file_size

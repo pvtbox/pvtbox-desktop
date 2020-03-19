@@ -18,6 +18,8 @@
 #   
 ###############################################################################
 from .shell_integration_client \
-    import send_download_link, send_copy_to_sync_dir, send_wipe_internal
+    import send_download_link, send_copy_to_sync_dir, send_wipe_internal, \
+    send_offline_on
 
-__all__ = [send_download_link, send_copy_to_sync_dir, send_wipe_internal]
+__all__ = [send_download_link, send_copy_to_sync_dir, send_wipe_internal,
+           send_offline_on]
