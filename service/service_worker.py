@@ -1728,5 +1728,7 @@ class ApplicationWorker(QObject):
         self._sync.smart_sync_changed()
 
     def _set_offline_dirs(self, offline_dirs, online_dirs):
-        shell_integration_signals.offline_paths.emit(offline_dirs, True)
-        shell_integration_signals.offline_paths.emit(online_dirs, False)
+        shell_integration_signals.offline_paths.emit(
+            offline_dirs, True, False)  # not is_recursive
+        shell_integration_signals.offline_paths.emit(
+            online_dirs, False, False)  # not is_recursive

@@ -39,7 +39,7 @@ logger.addHandler(logging.NullHandler())
 
 
 @qt_run
-def offline_paths(paths, is_offline=True):
+def offline_paths(paths, is_offline=True, is_recursive=True):
     """
     Makes given paths offline as is_offline flag
     @param paths paths [list]
@@ -126,7 +126,8 @@ def offline_paths(paths, is_offline=True):
 
         try:
             params.sync.file_added_to_indexing.emit(FilePath(path))
-            success = params.sync.make_offline(uuid, is_offline)
+            success = params.sync.make_offline(
+                uuid, is_offline, is_recursive=is_recursive)
         except FileEventsDBError:
             success = False
         if not success:

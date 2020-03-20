@@ -215,7 +215,7 @@ def file_info_slot(uuids, context):
     file_info(uuids, context)
 
 
-def offline_paths_slot(paths, is_offline=True):
+def offline_paths_slot(paths, is_offline=True, is_recursive=True):
     '''
     Processes 'offline_on', 'offline_off' shell commands
 
@@ -223,7 +223,7 @@ def offline_paths_slot(paths, is_offline=True):
     @param is_offline flag [bool]
     '''
 
-    offline_paths(paths, is_offline)
+    offline_paths(paths, is_offline, is_recursive)
 
 
 def connect_slots():

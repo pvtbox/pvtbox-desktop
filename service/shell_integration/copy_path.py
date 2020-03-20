@@ -142,9 +142,9 @@ def add_to_sync_dir(paths, move, callback):
         logger.debug("Copied successfully")
 
     if offline_paths:
-        signals.offline_paths.emit(offline_paths, False)
+        signals.offline_paths.emit(offline_paths, False, True)
     if online_paths:
-        signals.offline_paths.emit(online_paths, True)
+        signals.offline_paths.emit(online_paths, True, True)
 
     logger.debug("All paths copied")
     if callable(callback):

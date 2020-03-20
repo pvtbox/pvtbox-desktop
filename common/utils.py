@@ -1904,7 +1904,7 @@ def is_already_started():
             else:
                 pid = os.getpid()
         for proc in psutil.process_iter():
-            if proc.pid != pid and \
+            if proc.pid != pid and proc.pid != os.getpid() and \
                     proc.name() == process_name and \
                     proc.username().split('\\')[-1] == username:
                 return True

@@ -81,7 +81,7 @@ class IPCWebSocketProtocol(WebSocketServerProtocol):
             return
         elif cmd in ('offline_off', 'offline_on'):
             is_offline = cmd == 'offline_on'
-            emit_signal('offline_paths', paths, is_offline)
+            emit_signal('offline_paths', paths, is_offline, True)
             self.sendMessage(create_command(cmd).encode())
             return
         elif cmd == 'offline_status':

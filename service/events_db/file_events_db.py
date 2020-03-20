@@ -1235,7 +1235,7 @@ class FileEventsDB(object):
 
     @with_session
     def mark_child_offline(self, file_id, session=None, is_offline=True,
-                           read_only=False):
+                           read_only=False, is_recursive=True):
         not_offline = int(not is_offline)
         files_query = session.query(File) \
             .filter(File.is_folder == 0) \
@@ -1266,6 +1266,9 @@ class FileEventsDB(object):
             [{'id': f.id, 'toggle_offline': True}
              for f in files_unregistered])
 
+        if not is_recursive:
+            return not_applied
+
         folders_query = session.query(File) \
             .filter(File.is_folder)
         if file_id:
@@ -1283,9 +1286,10 @@ class FileEventsDB(object):
 
     @with_session
     def make_offline(self, uuid, session=None, is_offline=True,
-                     read_only=False):
+                     read_only=False, is_recursive=True):
         if not uuid:
-            return self.mark_child_offline(None, session, is_offline)
+            return self.mark_child_offline(None, session, is_offline,
+                                           is_recursive=is_recursive)
 
         file = self.get_file_by_uuid(uuid, session=session)
         if not file.is_folder and any(
@@ -1296,7 +1300,8 @@ class FileEventsDB(object):
         file.is_offline = is_offline
         file.toggle_offline = False
         if file.is_folder:
-            not_applied = self.mark_child_offline(file.id, session, is_offline)
+            not_applied = self.mark_child_offline(
+                file.id, session, is_offline, is_recursive=is_recursive)
         else:
             event = file.events[-1]
             event.state = 'received'

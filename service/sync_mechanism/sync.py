@@ -941,7 +941,8 @@ class Sync(QObject):
 
         return uuid
 
-    def make_offline(self, uuid, is_offline=True, timeout=2.0):
+    def make_offline(self, uuid, is_offline=True, timeout=2.0,
+                     is_recursive=True):
         '''
         Makes file or folder with uuid offline as is_offline flag
         @param uuid file or folder uuid [str]
@@ -952,7 +953,8 @@ class Sync(QObject):
         try:
             with self._db.soft_lock(timeout_sec=timeout):
                 self._db.make_offline(
-                    uuid, is_offline=is_offline, read_only=False)
+                    uuid, is_offline=is_offline, is_recursive=is_recursive,
+                    read_only=False)
                 if not is_offline and self._event_queue:
                     self._event_queue.cancel_downloads_for_parent_uuid(uuid)
                 self._recalculate_processing_events_count()

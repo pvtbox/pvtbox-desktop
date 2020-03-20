@@ -90,8 +90,8 @@ class ShellIntegrationSignals(QObject):
     file_info = Signal(list, str)
 
     # Signal to be emitted on shell commands 'offline_on', 'offline_off'
-    # Arguments are: paths [list], is_offline [bool]
-    offline_paths = Signal(list, bool)
+    # Arguments are: paths [list], is_offline [bool], is_recursive [bool]
+    offline_paths = Signal(list, bool, bool)
 
     # Signal to be emitted on 'file_info' processed
     # Arguments are: path [str], error [str], context [str]

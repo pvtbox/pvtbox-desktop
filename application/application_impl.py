@@ -75,10 +75,12 @@ class ApplicationImpl(QObject):
         @raise SystemExit
         '''
         logger.debug("Launching application...")
+        if is_portable():
+            logger.debug("Portable detected")
 
         # Acquire lock file to prevent multiple app instances launching
         lock_acquired = self.acquire_lock()
-        if not is_portable() and (not lock_acquired or is_already_started()):
+        if not lock_acquired or is_already_started():
             if 'wipe_internal' in args and args['wipe_internal']:
                 from common.tools import send_wipe_internal
                 send_wipe_internal()
@@ -98,13 +100,7 @@ class ApplicationImpl(QObject):
 
             raise SystemExit(0)
 
-        # Exit when attempt to run portable from different location
-        elif is_portable():
-            logger.debug("Portable detected")
-            if is_already_started():
-                logger.error("Application already started. Exiting")
-                send_show_command()
-                raise SystemExit(0)
+        register_smart()
 
         register_smart()
 

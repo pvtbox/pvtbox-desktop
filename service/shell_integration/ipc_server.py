@@ -139,7 +139,7 @@ def rx_thread_worker():
             continue
         elif cmd in ('offline_off', 'offline_on'):
             is_offline = cmd == 'offline_on'
-            emit_signal('offline_paths', paths, is_offline)
+            emit_signal('offline_paths', paths, is_offline, True)
             send_msg(create_command(cmd))
             continue
         elif cmd == 'offline_status':
